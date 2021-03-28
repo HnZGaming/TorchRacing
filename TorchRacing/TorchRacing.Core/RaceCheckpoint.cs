@@ -12,11 +12,10 @@ namespace TorchRacing.Core
         {
         }
 
-        public RaceCheckpoint(Vector3D position, float radius, string safeZoneName)
+        public RaceCheckpoint(Vector3D position, float radius)
         {
             Position = position;
             Radius = radius;
-            SafeZoneName = safeZoneName;
         }
 
         [JsonProperty("position")]
@@ -24,9 +23,6 @@ namespace TorchRacing.Core
 
         [JsonProperty("radius")]
         public float Radius { get; set; }
-
-        [JsonProperty("safezone")]
-        public string SafeZoneName { get; set; }
 
         public bool TryCheck(Vector3D position)
         {

@@ -163,6 +163,7 @@
         <Compile Include="TorchRacing.Core\RaceCheckpoint.cs" />
         <Compile Include="TorchRacing.Core\Racer.cs" />
         <Compile Include="TorchRacing.Core\RacingServer.cs" />
+        <Compile Include="TorchRacing.Core\RaceSafeZoneCollection.cs" />
         <Compile Include="TorchRacing.Core\SerializedRace.cs" />
         <Compile Include="TorchRacing\RacingCommandModule.cs" />
         <Compile Include="TorchRacing\RacingConfig.cs" />

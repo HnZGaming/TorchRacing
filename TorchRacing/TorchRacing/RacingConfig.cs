@@ -10,7 +10,7 @@ namespace TorchRacing
     public sealed class RacingConfig : ViewModel, RacingServer.IConfig
     {
         const string SafeZoneGroupName = "Checkpoint Safe Zone";
-        bool _allowActionsInSafeZone = true;
+        bool _allowActionsInSafeZone;
         double _searchRadius = 100;
         string _safeZoneColor = "#ffffff";
         string _safeZoneTexture = "SafeZone_Texture_Default";

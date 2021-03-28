@@ -4,23 +4,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using NLog;
-using Sandbox.Common.ObjectBuilders;
-using Sandbox.Game.Entities;
-using Torch.Utils;
 using Utils.General;
 using VRage.Game.ModAPI;
-using VRage.Game.ObjectBuilders.Components;
 using VRageMath;
 
 namespace TorchRacing.Core
 {
     public sealed class RacingServer : IDisposable
     {
-        public interface IConfig
+        public interface IConfig : RaceSafeZoneCollection.IConfig
         {
-            bool AllowActionsInSafeZone { get; }
-            string SafeZoneColor { get; }
-            string SafeZoneTexture { get; }
             double SearchRadius { get; }
         }
 
@@ -29,41 +22,32 @@ namespace TorchRacing.Core
         readonly IConfig _config;
         readonly StupidDb<SerializedRace> _db;
         readonly List<RaceCheckpoint> _checkpoints;
-        readonly List<MySafeZone> _checkpointSafezones;
+        readonly RaceSafeZoneCollection _safezones;
         Race _race;
 
-        public RacingServer(IConfig config, string dbFilePath)
+        public RacingServer(IConfig config, string dbPath)
         {
             _config = config;
-            _db = new StupidDb<SerializedRace>(dbFilePath);
+            _db = new StupidDb<SerializedRace>(dbPath);
             _checkpoints = new List<RaceCheckpoint>();
-            _checkpointSafezones = new List<MySafeZone>();
+            _safezones = new RaceSafeZoneCollection(config);
         }
 
         public void Initialize()
         {
             _db.Read();
 
-            if (!_db.TryQuery(DefaultRaceId, out var race)) return;
-
-            _checkpoints.AddRange(race.Checkpoints);
-
-            //gather all the safe zones
-            for (var i = 0; i < _checkpoints.Count; i++)
+            if (_db.TryQuery(DefaultRaceId, out var race))
             {
-                var checkpoint = _checkpoints[i];
-                var safezoneName = checkpoint.SafeZoneName ?? "";
-                if (!MyEntities.TryGetEntityByName<MySafeZone>(safezoneName, out var safezone))
+                for (var i = 0; i < race.Checkpoints.Length; i++)
                 {
-                    Log.Warn("Safe zone not found for checkpoint");
-                    safezone = CreateSafeZone(checkpoint.Position, checkpoint.Radius);
-                    checkpoint.SafeZoneName = safezone.Name;
+                    var checkpoint = race.Checkpoints[i];
+                    _checkpoints.Add(checkpoint);
+
+                    var safezone = race.CheckpointSafezones[i];
+                    _safezones.FindOrCreateAndAdd(safezone, checkpoint.Position, checkpoint.Radius);
                 }
-
-                _checkpointSafezones.AddOrInsert(safezone, i);
             }
-
-            WriteToDb();
         }
 
         public void Dispose()
@@ -73,43 +57,18 @@ namespace TorchRacing.Core
 
         public void Update()
         {
-            foreach (var safezone in _checkpointSafezones)
-            {
-                var lastAllowedActions = safezone.AllowedActions;
-                safezone.AllowedActions = _config.AllowActionsInSafeZone ? MySafeZoneAction.All : 0;
-                var safezoneAllowedActionsChanged = safezone.AllowedActions != lastAllowedActions;
-
-                if (safezoneAllowedActionsChanged)
-                {
-                    var builder = (MyObjectBuilder_SafeZone) safezone.GetObjectBuilder();
-                    MySessionComponentSafeZones.RequestUpdateSafeZone(builder);
-                    Log.Info("safe zone updated");
-                }
-            }
-
+            _safezones.Update();
             _race?.Update();
         }
 
         public void AddCheckpoint(IMyPlayer player, float radius)
         {
-            var playerPos = player.GetPosition();
-            var safezone = CreateSafeZone(playerPos, radius);
-            var checkpoint = new RaceCheckpoint(playerPos, radius, safezone.Name);
+            var position = player.GetPosition();
+            var checkpoint = new RaceCheckpoint(position, radius);
             _checkpoints.Add(checkpoint);
-            _checkpointSafezones.Add(safezone);
+            _safezones.CreateAndAdd(position, radius);
 
             WriteToDb();
-        }
-
-        MySafeZone CreateSafeZone(Vector3D playerPos, float radius)
-        {
-            return (MySafeZone) MySessionComponentSafeZones.CrateSafeZone(
-                MatrixD.CreateWorld(playerPos),
-                MySafeZoneShape.Sphere,
-                MySafeZoneAccess.Blacklist,
-                null, null, radius, true,
-                color: ColorUtils.TranslateColor(_config.SafeZoneColor),
-                visualTexture: _config.SafeZoneTexture ?? "");
         }
 
         public void RemoveCheckpoint(IMyPlayer player)
@@ -120,11 +79,7 @@ namespace TorchRacing.Core
             }
 
             _checkpoints.RemoveAt(checkpointIndex);
-
-            var removedSafezone = _checkpointSafezones[checkpointIndex];
-            MySessionComponentSafeZones.RemoveSafeZone(removedSafezone);
-            removedSafezone.Close();
-            MyEntities.Remove(removedSafezone);
+            _safezones.RemoveAt(checkpointIndex);
 
             WriteToDb();
         }
@@ -156,12 +111,7 @@ namespace TorchRacing.Core
         public void RemoveAllCheckpoints()
         {
             _checkpoints.Clear();
-            foreach (var removedSafezone in _checkpointSafezones)
-            {
-                MySessionComponentSafeZones.RemoveSafeZone(removedSafezone);
-                removedSafezone.Close();
-                MyEntities.Remove(removedSafezone);
-            }
+            _safezones.Clear();
 
             WriteToDb();
         }
@@ -173,6 +123,7 @@ namespace TorchRacing.Core
             {
                 RaceId = DefaultRaceId,
                 Checkpoints = _checkpoints.ToArray(),
+                CheckpointSafezones = _safezones.GetAllNames().ToArray(),
             });
             _db.Write();
         }

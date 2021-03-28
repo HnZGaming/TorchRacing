@@ -11,5 +11,8 @@ namespace TorchRacing.Core
 
         [JsonProperty("checkpoints")]
         public RaceCheckpoint[] Checkpoints { get; set; }
+
+        [JsonProperty("checkpoint_safezones")]
+        public string[] CheckpointSafezones { get; set; }
     }
 }
