@@ -48,6 +48,12 @@ namespace TorchRacing.Core
 
         public void FindOrCreateAndAdd(long id, Vector3D position, float radius)
         {
+            if (id == 0) // not using safe zone
+            {
+                _safezones.Add(NullOr.Null<MySafeZone>());
+                return;
+            }
+
             var safezone = FindOrCreate(id, position, radius);
             _safezones.Add(NullOr.NotNull(safezone));
         }
