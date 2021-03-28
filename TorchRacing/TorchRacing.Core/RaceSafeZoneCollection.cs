@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using NLog;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.Game.Entities;
 using Torch.Utils;
 using Utils.General;
-using VRage.Game.ObjectBuilders.Components;
 using VRageMath;
 
 namespace TorchRacing.Core
@@ -13,9 +14,8 @@ namespace TorchRacing.Core
     {
         public interface IConfig
         {
-            bool AllowActionsInSafeZone { get; }
-            string SafeZoneColor { get; }
-            string SafeZoneTexture { get; }
+            string DefaultSafeZoneColor { get; }
+            string DefaultSafeZoneTexture { get; }
         }
 
         static readonly ILogger Log = LogManager.GetCurrentClassLogger();
@@ -28,15 +28,9 @@ namespace TorchRacing.Core
             _safezones = new List<NullOr<MySafeZone>>();
         }
 
-        public IEnumerable<string> GetAllNames()
+        public IEnumerable<long> GetSafezoneIds()
         {
-            foreach (var safezoneOrNull in _safezones)
-            {
-                if (safezoneOrNull.TryGet(out var safezone))
-                {
-                    yield return safezone.Name;
-                }
-            }
+            return _safezones.Select(szr => szr.TryGet(out var s) ? s.EntityId : 0L);
         }
 
         public void Clear()
@@ -52,32 +46,20 @@ namespace TorchRacing.Core
             _safezones.Clear();
         }
 
-        public void Update()
+        public void FindOrCreateAndAdd(long id, Vector3D position, float radius)
         {
-            foreach (var safezoneRef in _safezones)
-            {
-                if (!safezoneRef.TryGet(out var safezone)) continue;
-
-                var lastAllowedActions = safezone.AllowedActions;
-                safezone.AllowedActions = _config.AllowActionsInSafeZone ? MySafeZoneAction.All : 0;
-
-                if (safezone.AllowedActions != lastAllowedActions)
-                {
-                    var builder = (MyObjectBuilder_SafeZone) safezone.GetObjectBuilder();
-                    MySessionComponentSafeZones.UpdateSafeZone(builder, true);
-                    Log.Info("safe zone config(s) updated");
-                }
-            }
-        }
-
-        public void FindOrCreateAndAdd(string name, Vector3D position, float radius)
-        {
-            var safezone = FindOrCreate(name, position, radius);
+            var safezone = FindOrCreate(id, position, radius);
             _safezones.Add(NullOr.NotNull(safezone));
         }
 
-        public void CreateAndAdd(Vector3D position, float radius)
+        public void CreateAndAdd(Vector3D position, float radius, bool useSafezone)
         {
+            if (!useSafezone)
+            {
+                _safezones.Add(NullOr.Null<MySafeZone>());
+                return;
+            }
+
             var safezone = CreateSafezone(position, radius);
             _safezones.Add(NullOr.NotNull(safezone));
         }
@@ -93,10 +75,11 @@ namespace TorchRacing.Core
             }
         }
 
-        MySafeZone FindOrCreate(string name, Vector3D position, float radius)
+        MySafeZone FindOrCreate(long id, Vector3D position, float radius)
         {
-            if (MyEntities.TryGetEntityByName<MySafeZone>(name, out var s)) return s;
-            return CreateSafezone(position, radius);
+            if (MyEntities.TryGetEntityById<MySafeZone>(id, out var s)) return s;
+            var safezone = CreateSafezone(position, radius);
+            return safezone;
         }
 
         MySafeZone CreateSafezone(Vector3D playerPos, float radius)
@@ -106,8 +89,8 @@ namespace TorchRacing.Core
                 MySafeZoneShape.Sphere,
                 MySafeZoneAccess.Blacklist,
                 null, null, radius, true,
-                color: ColorUtils.TranslateColor(_config.SafeZoneColor),
-                visualTexture: _config.SafeZoneTexture ?? "");
+                color: ColorUtils.TranslateColor(_config.DefaultSafeZoneColor),
+                visualTexture: _config.DefaultSafeZoneTexture ?? "");
         }
 
         static void DeleteSafezone(MySafeZone safezone)

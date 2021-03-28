@@ -35,10 +35,10 @@ namespace TorchRacing
 
         [Command("cpadd", "Add new checkpoint at the player position")]
         [Permission(MyPromoteLevel.Moderator)]
-        public void AddCheckpoint(float radius) => this.CatchAndReport(() =>
+        public void AddCheckpoint(float radius, bool useSafezone) => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
-            Server.AddCheckpoint(Context.Player, radius);
+            Server.AddCheckpoint(Context.Player, radius, useSafezone);
         });
 
         [Command("cpdel", "Remove the checkpoint closest to the player")]

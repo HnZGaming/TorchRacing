@@ -37,17 +37,18 @@ namespace TorchRacing.Core
         {
             _db.Read();
 
-            if (_db.TryQuery(DefaultRaceId, out var race))
-            {
-                for (var i = 0; i < race.Checkpoints.Length; i++)
-                {
-                    var checkpoint = race.Checkpoints[i];
-                    _checkpoints.Add(checkpoint);
+            if (!_db.TryQuery(DefaultRaceId, out var race)) return;
 
-                    var safezone = race.CheckpointSafezones[i];
-                    _safezones.FindOrCreateAndAdd(safezone, checkpoint.Position, checkpoint.Radius);
-                }
+            for (var i = 0; i < race.Checkpoints.Length; i++)
+            {
+                var checkpoint = race.Checkpoints[i];
+                _checkpoints.Add(checkpoint);
+
+                var safezone = race.CheckpointSafezones[i];
+                _safezones.FindOrCreateAndAdd(safezone, checkpoint.Position, checkpoint.Radius);
             }
+
+            WriteToDb();
         }
 
         public void Dispose()
@@ -57,16 +58,15 @@ namespace TorchRacing.Core
 
         public void Update()
         {
-            _safezones.Update();
             _race?.Update();
         }
 
-        public void AddCheckpoint(IMyPlayer player, float radius)
+        public void AddCheckpoint(IMyPlayer player, float radius, bool useSafezone)
         {
             var position = player.GetPosition();
             var checkpoint = new RaceCheckpoint(position, radius);
             _checkpoints.Add(checkpoint);
-            _safezones.CreateAndAdd(position, radius);
+            _safezones.CreateAndAdd(position, radius, useSafezone);
 
             WriteToDb();
         }
@@ -118,13 +118,15 @@ namespace TorchRacing.Core
 
         void WriteToDb()
         {
-            _db.Clear();
-            _db.Insert(new SerializedRace
+            var serializedRace = new SerializedRace
             {
                 RaceId = DefaultRaceId,
                 Checkpoints = _checkpoints.ToArray(),
-                CheckpointSafezones = _safezones.GetAllNames().ToArray(),
-            });
+                CheckpointSafezones = _safezones.GetSafezoneIds().ToArray(),
+            };
+
+            _db.Clear();
+            _db.Insert(serializedRace);
             _db.Write();
         }
 
