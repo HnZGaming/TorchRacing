@@ -64,7 +64,7 @@ namespace TorchRacing.Core
                 if (safezone.AllowedActions != lastAllowedActions)
                 {
                     var builder = (MyObjectBuilder_SafeZone) safezone.GetObjectBuilder();
-                    MySessionComponentSafeZones.UpdateSafeZone(builder);
+                    MySessionComponentSafeZones.UpdateSafeZone(builder, true);
                     Log.Info("safe zone config(s) updated");
                 }
             }
