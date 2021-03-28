@@ -7,13 +7,13 @@ using VRage.Game.ModAPI;
 namespace TorchRacing
 {
     [Category("race")]
-    public class RacingCommandModule : CommandModule
+    public sealed class RacingCommandModule : CommandModule
     {
         RacingPlugin Plugin => (RacingPlugin) Context.Plugin;
         RacingServer Server => Plugin.Server;
 
         [Command("configs", "Get or set config properties")]
-        [Permission(MyPromoteLevel.None)]
+        [Permission(MyPromoteLevel.Moderator)]
         public void Configs() => this.CatchAndReport(() =>
         {
             this.GetOrSetProperty(Plugin.Config);
@@ -26,25 +26,42 @@ namespace TorchRacing
             this.ShowCommands();
         });
 
+        [Command("status", "Show status of the race")]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void ShowStatus() => this.CatchAndReport(() =>
+        {
+            Context.Respond($"\n{Server}");
+        });
+
         [Command("cpadd", "Add new checkpoint at the player position")]
         [Permission(MyPromoteLevel.Moderator)]
-        public void AddCheckpoint() => this.CatchAndReport(() =>
+        public void AddCheckpoint(float radius) => this.CatchAndReport(() =>
         {
-            Server.AddCheckpoint(Context.Player);
+            this.EnsureInvokedByPlayer();
+            Server.AddCheckpoint(Context.Player, radius);
         });
 
         [Command("cpdel", "Remove the checkpoint closest to the player")]
         [Permission(MyPromoteLevel.Moderator)]
         public void RemoveCheckpoint() => this.CatchAndReport(() =>
         {
+            this.EnsureInvokedByPlayer();
             Server.RemoveCheckpoint(Context.Player);
+        });
+
+        [Command("cpdelall", "Remove the checkpoint closest to the player")]
+        [Permission(MyPromoteLevel.Moderator)]
+        public void RemoveAllCheckpoints() => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.RemoveAllCheckpoints();
         });
 
         [Command("init", "Initialize a new race")]
         [Permission(MyPromoteLevel.None)]
-        public void InitializeRace() => this.CatchAndReport(() =>
+        public void InitializeRace(int lapCount = 1) => this.CatchAndReport(() =>
         {
-            Server.InitializeRace(Context.Player);
+            Server.InitializeRace(Context.Player, lapCount);
         });
 
         [Command("join", "Join the race if any")]
@@ -54,11 +71,18 @@ namespace TorchRacing
             Server.JoinRace(Context.Player);
         });
 
+        [Command("exit", "Exit the race if any")]
+        [Permission(MyPromoteLevel.None)]
+        public void ExitRace() => this.CatchAndReport(() =>
+        {
+            Server.ExitRace(Context.Player);
+        });
+
         [Command("start", "Start the race in N seconds")]
         [Permission(MyPromoteLevel.None)]
-        public void StartRace(int countdown = 5) => this.CatchAndReport(() =>
+        public void StartRace(int countdown = 5) => this.CatchAndReport(async () =>
         {
-            Server.StartRace(Context.Player, countdown);
+            await Server.StartRace(Context.Player, countdown);
         });
 
         [Command("end", "End the race if any")]

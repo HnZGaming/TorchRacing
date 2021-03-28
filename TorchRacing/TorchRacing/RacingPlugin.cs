@@ -4,17 +4,19 @@ using Torch;
 using Torch.API;
 using Torch.API.Plugins;
 using TorchRacing.Core;
+using Utils.General;
 using Utils.Torch;
 
 namespace TorchRacing
 {
-    public class RacingPlugin : TorchPluginBase, IWpfPlugin
+    public sealed class RacingPlugin : TorchPluginBase, IWpfPlugin
     {
         static readonly ILogger Log = LogManager.GetCurrentClassLogger();
 
         Persistent<RacingConfig> _config;
         UserControl _userControl;
         RacingServer _racingServer;
+        StupidDb<SerializedRace> _db;
 
         public RacingConfig Config => _config.Data;
         public RacingServer Server => _racingServer;
@@ -30,13 +32,18 @@ namespace TorchRacing
             this.ListenOnGameLoaded(OnGameLoad);
             this.ListenOnGameUnloading(OnGameUnloading);
 
+            GameLoopObserverManager.Add(Torch);
+
             var configPath = this.MakeConfigFilePath();
             _config = Persistent<RacingConfig>.Load(configPath);
+
+            var dbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.json");
+            _db = new StupidDb<SerializedRace>(dbPath);
         }
 
         void OnGameLoad()
         {
-            _racingServer = new RacingServer(Config);
+            _racingServer = new RacingServer(Config, _db);
             _racingServer.Initialize();
         }
 
@@ -48,7 +55,7 @@ namespace TorchRacing
 
         void OnGameUnloading()
         {
-            _racingServer.Clear();
+            _racingServer.Dispose();
         }
     }
 }
