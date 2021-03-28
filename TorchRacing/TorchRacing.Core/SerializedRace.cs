@@ -10,9 +10,9 @@ namespace TorchRacing.Core
         public string RaceId { get; set; }
 
         [JsonProperty("checkpoints")]
-        public RaceCheckpoint[] Checkpoints { get; set; }
+        public RaceCheckpoint[] Checkpoints { get; set; } = new RaceCheckpoint[0];
 
         [JsonProperty("checkpoint_safezones")]
-        public string[] CheckpointSafezones { get; set; }
+        public string[] CheckpointSafezones { get; set; } = new string[0];
     }
 }
