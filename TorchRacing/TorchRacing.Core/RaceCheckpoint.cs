@@ -7,37 +7,35 @@ namespace TorchRacing.Core
     // don't store stateful data
     public sealed class RaceCheckpoint
     {
-        [JsonProperty("position")]
-        SerializableVector3 _position;
-
-        [JsonProperty("radius")]
-        float _radius;
-
         [JsonConstructor]
         RaceCheckpoint()
         {
         }
 
-        public RaceCheckpoint(Vector3D position, float radius)
+        public RaceCheckpoint(Vector3D position, float radius, string safeZoneName)
         {
             Position = position;
-            _radius = radius;
+            Radius = radius;
+            SafeZoneName = safeZoneName;
         }
 
-        public Vector3D Position
-        {
-            get => _position.ToVector3();
-            private set => _position = new SerializableVector3(value);
-        }
+        [JsonProperty("position")]
+        public Vector3D Position { get; set; }
+
+        [JsonProperty("radius")]
+        public float Radius { get; set; }
+
+        [JsonProperty("safezone")]
+        public string SafeZoneName { get; set; }
 
         public bool TryCheck(Vector3D position)
         {
-            return Vector3D.Distance(position, Position) < _radius;
+            return Vector3D.Distance(position, Position) < Radius;
         }
 
         public override string ToString()
         {
-            return $"{Position} ({_radius:0.0}m)";
+            return $"{Position.ToShortString()} ({Radius:0.0}m)";
         }
     }
 }

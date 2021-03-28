@@ -23,6 +23,14 @@ namespace TorchRacing.Core
         public int CheckCount => _testedCheckpoints.Count;
         public int LapCount { get; private set; }
         public bool IsOnline => MySession.Static.Players.IsPlayerOnline(_player.IdentityId);
+        public int? LastCheckpoint { get; private set; }
+
+        public void Reset()
+        {
+            _testedCheckpoints.Clear();
+            LastCheckpoint = null;
+            LapCount = 0;
+        }
 
         public bool HasChecked(int checkpointIndex)
         {
@@ -32,6 +40,7 @@ namespace TorchRacing.Core
         public void Check(int checkpointIndex)
         {
             _testedCheckpoints.Add(checkpointIndex);
+            LastCheckpoint = checkpointIndex;
         }
 
         public void ClearChecks()
@@ -52,11 +61,11 @@ namespace TorchRacing.Core
             builder.Append(' ');
             builder.Append(_player.IdentityId);
             builder.AppendLine();
-            builder.Append('\t');
+            builder.Append("--");
             builder.Append("Lap count: ");
             builder.Append(LapCount);
             builder.AppendLine();
-            builder.Append('\t');
+            builder.Append("--");
             builder.Append("Checkpoints: ");
             builder.Append(_testedCheckpoints.OrderBy(c => c).ToStringSeq());
 

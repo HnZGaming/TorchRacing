@@ -28,6 +28,7 @@ namespace TorchRacing.Core
 
         public void Dispose()
         {
+            _racers.Clear();
         }
 
         public void AddRacer(IMyPlayer player)
@@ -87,6 +88,15 @@ namespace TorchRacing.Core
             //TODO broadcast
         }
 
+        public void Reset(long playerId)
+        {
+            ThrowIfNotHostPlayer(playerId);
+            foreach (var (_, racer) in _racers)
+            {
+                racer.Reset();
+            }
+        }
+
         public void Update()
         {
             if (!_isRacing) return;
@@ -122,6 +132,7 @@ namespace TorchRacing.Core
                 {
                     var checkpoint = _checkpoints[i];
                     if (racer.HasChecked(i)) continue;
+                    if (racer.LastCheckpoint == i) continue;
                     if (!checkpoint.TryCheck(racer.Position)) continue;
 
                     racer.Check(i);
@@ -133,7 +144,7 @@ namespace TorchRacing.Core
 
                     //TODO broadcast
 
-                    if (racer.LapCount <= _totalLapCount) continue;
+                    if (racer.LapCount < _totalLapCount) continue;
 
                     // TODO remove gps for this player
 
@@ -157,14 +168,6 @@ namespace TorchRacing.Core
         public override string ToString()
         {
             var builder = new StringBuilder();
-
-            builder.Append("Checkpoints: ");
-            builder.AppendLine();
-            foreach (var checkpoint in _checkpoints)
-            {
-                builder.Append(checkpoint);
-                builder.AppendLine();
-            }
 
             builder.Append("Racers: ");
             builder.AppendLine();

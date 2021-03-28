@@ -59,7 +59,7 @@ namespace TorchRacing
 
         [Command("init", "Initialize a new race")]
         [Permission(MyPromoteLevel.None)]
-        public void InitializeRace(int lapCount = 1) => this.CatchAndReport(() =>
+        public void InitializeRace(int lapCount) => this.CatchAndReport(() =>
         {
             Server.InitializeRace(Context.Player, lapCount);
         });
@@ -97,6 +97,13 @@ namespace TorchRacing
         public void CancelRace() => this.CatchAndReport(() =>
         {
             Server.CancelRace(Context.Player);
+        });
+
+        [Command("reset", "Reset the current race state")]
+        [Permission(MyPromoteLevel.None)]
+        public void ResetRace() => this.CatchAndReport(() =>
+        {
+            Server.ResetRace(Context.Player);
         });
     }
 }
