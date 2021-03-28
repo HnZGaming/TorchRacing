@@ -16,7 +16,6 @@ namespace TorchRacing
         Persistent<RacingConfig> _config;
         UserControl _userControl;
         RacingServer _racingServer;
-        StupidDb<SerializedRace> _db;
 
         public RacingConfig Config => _config.Data;
         public RacingServer Server => _racingServer;
@@ -36,14 +35,12 @@ namespace TorchRacing
 
             var configPath = this.MakeConfigFilePath();
             _config = Persistent<RacingConfig>.Load(configPath);
-
-            var dbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.json");
-            _db = new StupidDb<SerializedRace>(dbPath);
         }
 
         void OnGameLoad()
         {
-            _racingServer = new RacingServer(Config, _db);
+            var dbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.json");
+            _racingServer = new RacingServer(Config, dbPath);
             _racingServer.Initialize();
         }
 

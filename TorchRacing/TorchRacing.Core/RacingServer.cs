@@ -32,10 +32,10 @@ namespace TorchRacing.Core
         readonly List<MySafeZone> _checkpointSafezones;
         Race _race;
 
-        public RacingServer(IConfig config, StupidDb<SerializedRace> db)
+        public RacingServer(IConfig config, string dbFilePath)
         {
             _config = config;
-            _db = db;
+            _db = new StupidDb<SerializedRace>(dbFilePath);
             _checkpoints = new List<RaceCheckpoint>();
             _checkpointSafezones = new List<MySafeZone>();
         }
