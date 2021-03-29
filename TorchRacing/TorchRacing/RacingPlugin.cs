@@ -48,6 +48,8 @@ namespace TorchRacing
             var dbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.json");
             _racingServer = new RacingServer(Config, gpss, chatManager, dbPath);
             _racingServer.Initialize();
+            
+            Log.Debug("Racing plugin loaded");
         }
 
         public override void Update()
