@@ -24,7 +24,7 @@ namespace TorchRacing.Core
         [JsonProperty("radius")]
         public float Radius { get; set; }
 
-        public bool TryCheck(Vector3D position)
+        public bool Test(Vector3D position)
         {
             return Vector3D.Distance(position, Position) < Radius;
         }

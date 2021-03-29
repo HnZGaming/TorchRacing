@@ -154,15 +154,18 @@ namespace TorchRacing.Core
                 for (var i = 0; i < _checkpoints.Count; i++)
                 {
                     var checkpoint = _checkpoints[i];
-                    if (racer.HasChecked(i)) continue;
-                    if (racer.LastCheckpoint == i) continue;
-                    if ((racer.LastCheckpoint ?? -1) != i - 1) continue;
-                    if (!checkpoint.TryCheck(racer.Position)) continue;
+
+                    if (!checkpoint.Test(racer.Position)) continue; // proximity
+                    if (racer.HasChecked(i)) continue; // no duplicate
+
+                    // prevent checking the final checkpoint at the beginning of the race
+                    // (make sure the player has stepped on the last checkpoint)
+                    if ((racer.LastCheckpoint ?? -1) + 1 != i) continue;
 
                     racer.Check(i);
 
                     //show the next checkpoint gps
-                    var nextGpsPosition = _checkpoints[i + 1 % _checkpoints.Count].Position;
+                    var nextGpsPosition = _checkpoints[(i + 1) % _checkpoints.Count].Position;
                     _gpss.ShowGpss(racer.IdentityId, new[] {nextGpsPosition});
 
                     if (racer.CheckCount < _checkpoints.Count) continue;
@@ -185,7 +188,7 @@ namespace TorchRacing.Core
 
                     _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
 
-                    if (!_racers.Values.All(r => r.LapCount > _totalLapCount)) continue;
+                    if (!_racers.Values.All(r => r.LapCount >= _totalLapCount)) continue;
 
                     _isRacing = false;
 

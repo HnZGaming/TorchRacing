@@ -50,6 +50,7 @@ namespace TorchRacing.Core
         public void ClearChecks()
         {
             _testedCheckpoints.Clear();
+            LastCheckpoint = null;
         }
 
         public void IncrementLap()
