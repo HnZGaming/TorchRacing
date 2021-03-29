@@ -5,6 +5,7 @@ using Torch.API;
 using Torch.API.Managers;
 using Torch.API.Plugins;
 using TorchRacing.Core;
+using Utils.General;
 using Utils.Torch;
 
 namespace TorchRacing
@@ -37,12 +38,14 @@ namespace TorchRacing
 
         void OnGameLoad()
         {
-            var dbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.json");
-            var chatManager = Torch.Managers.GetManager<IChatManagerServer>();
+            var chatManager = Torch.CurrentSession.Managers.GetManager<IChatManagerServer>();
+            chatManager.ThrowIfNull("chat manager not found");
+
             var gpsHashDbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.gpss.json");
-            var gpss = new RaceGpsCollection(gpsHashDbPath);
+            var gpss = new RaceGpsCollection(Config, gpsHashDbPath);
             gpss.Initialize();
 
+            var dbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.json");
             _racingServer = new RacingServer(Config, gpss, chatManager, dbPath);
             _racingServer.Initialize();
         }

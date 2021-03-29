@@ -1,23 +1,34 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using NLog;
 using Sandbox.Game.Screens.Helpers;
 using Sandbox.Game.World;
+using Torch.Utils;
 using Utils.General;
 using Utils.Torch;
 using Utils.Torch.Patches;
+using VRage.Game;
 using VRageMath;
 
 namespace TorchRacing.Core
 {
     public sealed class RaceGpsCollection
     {
+        public interface IConfig
+        {
+            string GpsColor { get; }
+        }
+
         const string DefaultTableName = "default";
+        static readonly ILogger Log = LogManager.GetCurrentClassLogger();
+        readonly IConfig _config;
         readonly StupidDb<SerializedGpsHashSet> _db;
         readonly Dictionary<long, HashSet<int>> _gpsHashes;
         bool _isDirty;
 
-        public RaceGpsCollection(string dbPath)
+        public RaceGpsCollection(IConfig config, string dbPath)
         {
+            _config = config;
             _db = new StupidDb<SerializedGpsHashSet>(dbPath);
             _gpsHashes = new Dictionary<long, HashSet<int>>();
         }
@@ -55,14 +66,23 @@ namespace TorchRacing.Core
 
             foreach (var position in positions)
             {
-                var gps = new MyGps();
-                gps.Coords = position;
-                gps.DisplayName = "CHECKPOINT";
+                var gps = new MyGps(new MyObjectBuilder_Gps.Entry
+                {
+                    DisplayName = "CHECKPOINT",
+                    coords = position,
+                    color = ColorUtils.TranslateColor(_config.GpsColor),
+                    showOnHud = true,
+                    isObjective = true,
+                    alwaysVisible = true,
+                });
+
                 gps.UpdateHash();
 
                 _gpsHashes.Add(playerId, gps.Hash);
                 MySession.Static.Gpss.SendAddGps(playerId, gps, true);
             }
+
+            Log.Info($"ShowGpss({playerId}, {positions.Select(p => p.ToShortString()).ToStringSeq()})");
         }
 
         public void WriteIfNecessary()
@@ -70,11 +90,14 @@ namespace TorchRacing.Core
             if (!_isDirty) return;
 
             var gpsHashes = new SerializedGpsHashSet();
+            gpsHashes.Id = DefaultTableName;
             gpsHashes.GpsHashes = _gpsHashes.Values.Flatten().ToSet().ToArray();
 
             _db.Clear();
             _db.Insert(gpsHashes);
             _db.Write();
+
+            _isDirty = false;
         }
     }
 }

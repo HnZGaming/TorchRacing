@@ -12,7 +12,6 @@ namespace TorchRacing.Core
     {
         readonly IMyPlayer _player;
         readonly HashSet<int> _testedCheckpoints;
-        long _identityId;
 
         public Racer(IMyPlayer player)
         {

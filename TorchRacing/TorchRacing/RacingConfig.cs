@@ -7,12 +7,13 @@ using VRage.Game.ModAPI;
 
 namespace TorchRacing
 {
-    public sealed class RacingConfig : ViewModel, RacingServer.IConfig
+    public sealed class RacingConfig : ViewModel, RacingServer.IConfig, RaceGpsCollection.IConfig
     {
         const string SafeZoneGroupName = "Checkpoint Safe Zone";
         double _searchRadius = 100;
         string _safeZoneColor = "#ffffff";
         string _safeZoneTexture = "SafeZone_Texture_Default";
+        string _gpsColor = "#00ffff";
 
         [XmlElement]
         [Display(Name = "Search radius", Description = "Radius to search for race checkpoints for commands")]
@@ -39,6 +40,15 @@ namespace TorchRacing
         {
             get => _safeZoneTexture;
             set => SetValue(ref _safeZoneTexture, value);
+        }
+
+        [XmlElement]
+        [Display(Name = "Checkpoint GPS color")]
+        [ConfigProperty(MyPromoteLevel.Moderator)]
+        public string GpsColor
+        {
+            get => _gpsColor;
+            set => SetValue(ref _gpsColor, value);
         }
     }
 }
