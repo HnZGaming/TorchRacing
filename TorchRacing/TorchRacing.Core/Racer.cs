@@ -12,6 +12,7 @@ namespace TorchRacing.Core
     {
         readonly IMyPlayer _player;
         readonly HashSet<int> _testedCheckpoints;
+        long _identityId;
 
         public Racer(IMyPlayer player)
         {
@@ -24,6 +25,10 @@ namespace TorchRacing.Core
         public int LapCount { get; private set; }
         public bool IsOnline => MySession.Static.Players.IsPlayerOnline(_player.IdentityId);
         public int? LastCheckpoint { get; private set; }
+
+        public string Name => _player.DisplayName;
+
+        public long IdentityId => _player.IdentityId;
 
         public void Reset()
         {

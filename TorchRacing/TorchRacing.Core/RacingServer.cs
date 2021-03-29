@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using NLog;
+using Torch.API.Managers;
 using Utils.General;
 using VRage.Game.ModAPI;
-using VRageMath;
 
 namespace TorchRacing.Core
 {
@@ -20,14 +20,18 @@ namespace TorchRacing.Core
         const string DefaultRaceId = "default";
         static readonly ILogger Log = LogManager.GetCurrentClassLogger();
         readonly IConfig _config;
+        readonly RaceGpsCollection _gpss;
+        readonly IChatManagerServer _chatManager;
         readonly StupidDb<SerializedRace> _db;
         readonly List<RaceCheckpoint> _checkpoints;
         readonly RaceSafeZoneCollection _safezones;
         Race _race;
 
-        public RacingServer(IConfig config, string dbPath)
+        public RacingServer(IConfig config, RaceGpsCollection gpss, IChatManagerServer chatManager, string dbPath)
         {
             _config = config;
+            _gpss = gpss;
+            _chatManager = chatManager;
             _db = new StupidDb<SerializedRace>(dbPath);
             _checkpoints = new List<RaceCheckpoint>();
             _safezones = new RaceSafeZoneCollection(config);
@@ -59,6 +63,7 @@ namespace TorchRacing.Core
         public void Update()
         {
             _race?.Update();
+            _gpss.WriteIfNecessary();
         }
 
         public void AddCheckpoint(IMyPlayer player, float radius, bool useSafezone)
@@ -73,7 +78,9 @@ namespace TorchRacing.Core
 
         public void RemoveCheckpoint(IMyPlayer player)
         {
-            if (!TryGetNearestCheckpoint(player.GetPosition(), out var checkpointIndex))
+            var position = player.GetPosition();
+            var maxRadius = _config.SearchRadius;
+            if (!_checkpoints.TryGetNearestPositionIndex(position, maxRadius, out var checkpointIndex))
             {
                 throw new Exception("No checkpoints found in the range");
             }
@@ -82,30 +89,6 @@ namespace TorchRacing.Core
             _safezones.RemoveAt(checkpointIndex);
 
             WriteToDb();
-        }
-
-        bool TryGetNearestCheckpoint(Vector3D position, out int nearestCheckpointIndex)
-        {
-            nearestCheckpointIndex = -1;
-
-            if (!_checkpoints.Any()) return false;
-
-            var minDistance = double.MaxValue;
-            for (var i = 0; i < _checkpoints.Count; i++)
-            {
-                var checkpoint = _checkpoints[i];
-                var checkpointPos = checkpoint.Position;
-                var distance = Vector3D.Distance(position, checkpointPos);
-                if (distance > _config.SearchRadius) continue;
-
-                if (distance < minDistance)
-                {
-                    minDistance = distance;
-                    nearestCheckpointIndex = i;
-                }
-            }
-
-            return nearestCheckpointIndex >= 0;
         }
 
         public void RemoveAllCheckpoints()
@@ -133,7 +116,7 @@ namespace TorchRacing.Core
         public void InitializeRace(IMyPlayer player, int lapCount)
         {
             _race?.Dispose();
-            _race = new Race(_checkpoints, player.IdentityId, lapCount);
+            _race = new Race(_chatManager, _gpss, _checkpoints, player.SteamUserId, lapCount);
             _race.AddRacer(player);
         }
 
@@ -152,25 +135,13 @@ namespace TorchRacing.Core
         public async Task StartRace(IMyPlayer player, int countdown)
         {
             _race.ThrowIfNull("race not initialized");
-            await _race.Start(player.IdentityId, countdown);
-        }
-
-        public void EndRace(IMyPlayer player)
-        {
-            _race.ThrowIfNull("race not initialized");
-            _race.End(player.IdentityId);
-        }
-
-        public void CancelRace(IMyPlayer player)
-        {
-            _race.ThrowIfNull("race not initialized");
-            _race.Cancel(player.IdentityId);
+            await _race.Start(player.SteamUserId, countdown);
         }
 
         public void ResetRace(IMyPlayer player)
         {
             _race.ThrowIfNull("race not initialized");
-            _race.Reset(player.IdentityId);
+            _race.Reset(player.SteamUserId);
         }
 
         public override string ToString()

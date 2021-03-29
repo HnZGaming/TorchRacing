@@ -2,6 +2,7 @@
 using NLog;
 using Torch;
 using Torch.API;
+using Torch.API.Managers;
 using Torch.API.Plugins;
 using TorchRacing.Core;
 using Utils.Torch;
@@ -30,8 +31,6 @@ namespace TorchRacing
             this.ListenOnGameLoaded(OnGameLoad);
             this.ListenOnGameUnloading(OnGameUnloading);
 
-            GameLoopObserverManager.Add(Torch);
-
             var configPath = this.MakeConfigFilePath();
             _config = Persistent<RacingConfig>.Load(configPath);
         }
@@ -39,7 +38,12 @@ namespace TorchRacing
         void OnGameLoad()
         {
             var dbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.json");
-            _racingServer = new RacingServer(Config, dbPath);
+            var chatManager = Torch.Managers.GetManager<IChatManagerServer>();
+            var gpsHashDbPath = this.MakeFilePath($"{nameof(RacingPlugin)}.gpss.json");
+            var gpss = new RaceGpsCollection(gpsHashDbPath);
+            gpss.Initialize();
+
+            _racingServer = new RacingServer(Config, gpss, chatManager, dbPath);
             _racingServer.Initialize();
         }
 

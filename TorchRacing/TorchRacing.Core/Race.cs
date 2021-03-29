@@ -4,26 +4,42 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Sandbox.Game.World;
+using Torch;
+using Torch.API.Managers;
 using Utils.General;
 using Utils.Torch;
 using VRage.Game.ModAPI;
+using VRageMath;
 
 namespace TorchRacing.Core
 {
     public sealed class Race : IDisposable
     {
-        readonly Dictionary<long, Racer> _racers;
+        const string RaceServer = "Race";
+        readonly IChatManagerServer _chatManager;
+        readonly Dictionary<ulong, Racer> _racers;
         readonly IReadOnlyList<RaceCheckpoint> _checkpoints;
-        readonly long _hostPlayerId;
+        readonly RaceGpsCollection _gpss;
+        readonly ulong _hostId;
+        readonly List<ulong> _finishedRacerIds;
+        readonly List<(ulong, string)> _tmpRemovedRacers;
         readonly int _totalLapCount;
         bool _isRacing;
 
-        public Race(IReadOnlyList<RaceCheckpoint> checkpoints, long hostPlayerId, int lapCount)
+        public Race(IChatManagerServer chatManager,
+            RaceGpsCollection gpss,
+            IReadOnlyList<RaceCheckpoint> checkpoints,
+            ulong hostId,
+            int lapCount)
         {
+            _chatManager = chatManager;
             _checkpoints = checkpoints;
-            _hostPlayerId = hostPlayerId;
+            _gpss = gpss;
+            _hostId = hostId;
             _totalLapCount = lapCount;
-            _racers = new Dictionary<long, Racer>();
+            _racers = new Dictionary<ulong, Racer>();
+            _finishedRacerIds = new List<ulong>();
+            _tmpRemovedRacers = new List<(ulong, string)>();
         }
 
         public void Dispose()
@@ -33,34 +49,45 @@ namespace TorchRacing.Core
 
         public void AddRacer(IMyPlayer player)
         {
-            if (_racers.ContainsKey(player.IdentityId))
+            if (_racers.ContainsKey(player.SteamUserId))
             {
                 throw new Exception("Already joined the race");
             }
 
             var racer = new Racer(player);
-            _racers[player.IdentityId] = racer;
+            _racers[player.SteamUserId] = racer;
 
-            //TODO broadcast
+            SendMessageToAllRacers($"{player.DisplayName} joined the race!");
+
+            // show gpss to this player
+
+            var gpsPositions = _isRacing
+                ? new[] {_checkpoints[0].Position}
+                : _checkpoints.Select(c => c.Position);
+
+            _gpss.ShowGpss(player.IdentityId, gpsPositions);
         }
 
         public void RemoveRacer(IMyPlayer player)
         {
-            if (!_racers.Remove(player.IdentityId))
+            if (!_racers.Remove(player.SteamUserId))
             {
                 throw new Exception("Not joined the race");
             }
 
-            //TODO broadcast
+            SendMessageToAllRacers($"{player.DisplayName} left the race");
+
+            _gpss.ShowGpss(player.IdentityId, Enumerable.Empty<Vector3D>());
         }
 
-        public async Task Start(long playerId, int countdown)
+        public async Task Start(ulong playerId, int countdown)
         {
-            ThrowIfNotHostPlayer(playerId);
+            ThrowIfNotHostOrAdmin(playerId);
+            Reset(playerId);
 
             for (var i = 0; i < countdown; i++)
             {
-                //TODO broadcast countdown
+                SendMessageToAllRacers($"Starting race in {countdown - i} seconds...");
 
                 await Task.Delay(1.Seconds());
                 await GameLoopObserver.MoveToGameLoop();
@@ -68,101 +95,122 @@ namespace TorchRacing.Core
 
             _isRacing = true;
 
-            //TODO broadcast
-            //TODO start showing gps and stuff
+            // show the first gps for all racers
+            foreach (var (_, racer) in _racers)
+            {
+                var gpsPositions = new[] {_checkpoints[0].Position};
+                _gpss.ShowGpss(racer.IdentityId, gpsPositions);
+            }
+
+            SendMessageToAllRacers("GO!");
         }
 
-        public void End(long playerId)
+        public void Reset(ulong playerId)
         {
-            ThrowIfNotHostPlayer(playerId);
-            _isRacing = false;
+            ThrowIfNotHostOrAdmin(playerId);
 
-            //TODO broadcast
-        }
-
-        public void Cancel(long playerId)
-        {
-            ThrowIfNotHostPlayer(playerId);
-            _isRacing = false;
-
-            //TODO broadcast
-        }
-
-        public void Reset(long playerId)
-        {
-            ThrowIfNotHostPlayer(playerId);
             foreach (var (_, racer) in _racers)
             {
                 racer.Reset();
             }
+
+            _finishedRacerIds.Clear();
+
+            _isRacing = false;
+
+            SendMessageToAllRacers("Race has been reset");
         }
 
-        public void Update()
+        public void Update() // NOTE this is called EVERY frame
         {
-            if (!_isRacing) return;
-
-            // cancel if host is offline
-            if (!MySession.Static.Players.IsPlayerOnline(_hostPlayerId))
-            {
-                _isRacing = false;
-                return;
-            }
-
             // remove offline players from the race
-            foreach (var (id, racer) in _racers.ToArray())
+            _tmpRemovedRacers.Clear();
+            foreach (var (id, racer) in _racers)
             {
                 if (!racer.IsOnline)
                 {
-                    _racers.Remove(id);
-
-                    //TODO broadcast
+                    _tmpRemovedRacers.Add((id, racer.Name));
                 }
             }
 
-            // cancel if there's no racers
-            if (!_racers.Any())
+            // cont. removing offline players
+            foreach (var (removedRacerId, racerName) in _tmpRemovedRacers)
             {
-                _isRacing = false;
+                _racers.Remove(removedRacerId);
+                SendMessageToAllRacers($"{racerName} left the race");
+            }
+
+            if (!_isRacing) return;
+
+            // cancel if there's no racers
+            if (_racers.Count == 0)
+            {
+                Reset(0);
                 return;
             }
 
-            foreach (var (_, racer) in _racers)
+            foreach (var (racerId, racer) in _racers)
             {
                 for (var i = 0; i < _checkpoints.Count; i++)
                 {
                     var checkpoint = _checkpoints[i];
                     if (racer.HasChecked(i)) continue;
                     if (racer.LastCheckpoint == i) continue;
+                    if ((racer.LastCheckpoint ?? -1) != i - 1) continue;
                     if (!checkpoint.TryCheck(racer.Position)) continue;
 
                     racer.Check(i);
+
+                    //show the next checkpoint gps
+                    var nextGpsPosition = _checkpoints[i + 1 % _checkpoints.Count].Position;
+                    _gpss.ShowGpss(racer.IdentityId, new[] {nextGpsPosition});
 
                     if (racer.CheckCount < _checkpoints.Count) continue;
 
                     racer.ClearChecks();
                     racer.IncrementLap();
 
-                    //TODO broadcast
+                    if (racer.LapCount < _totalLapCount)
+                    {
+                        var order = LangUtils.OrderToString(racer.LapCount);
+                        var remainingLapCount = _totalLapCount - racer.LapCount;
+                        SendMessageToAllRacers($"{racer.Name} has finished the {order} lap! {remainingLapCount} laps to go");
+                        continue;
+                    }
 
-                    if (racer.LapCount < _totalLapCount) continue;
+                    _finishedRacerIds.Add(racerId);
 
-                    // TODO remove gps for this player
+                    var position = LangUtils.OrderToString(_finishedRacerIds.Count);
+                    SendMessageToAllRacers($"{racer.Name} GOAL! {position} position!");
+
+                    _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
 
                     if (!_racers.Values.All(r => r.LapCount > _totalLapCount)) continue;
 
                     _isRacing = false;
 
-                    // TODO broadcast
+                    SendMessageToAllRacers("Everyone finished the race! Type `!race start` to start the new race");
                 }
             }
         }
 
-        void ThrowIfNotHostPlayer(long playerId)
+        void SendMessageToAllRacers(string message)
         {
-            if (playerId != _hostPlayerId)
+            foreach (var (racerId, _) in _racers)
             {
-                throw new Exception("Not a host player");
+                _chatManager.SendMessage(RaceServer, racerId, message);
             }
+        }
+
+        void ThrowIfNotHostOrAdmin(ulong steamId)
+        {
+            if (steamId == 0) return;
+            if (steamId == _hostId) return;
+
+            var player = (IMyPlayer) MySession.Static.Players.TryGetPlayerBySteamId(steamId);
+            if (player?.PromoteLevel >= MyPromoteLevel.Moderator) return;
+
+            throw new Exception("not a host");
         }
 
         public override string ToString()

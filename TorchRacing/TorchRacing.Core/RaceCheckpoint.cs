@@ -5,7 +5,7 @@ using VRageMath;
 namespace TorchRacing.Core
 {
     // don't store stateful data
-    public sealed class RaceCheckpoint
+    public sealed class RaceCheckpoint : HasPosition
     {
         [JsonConstructor]
         RaceCheckpoint()

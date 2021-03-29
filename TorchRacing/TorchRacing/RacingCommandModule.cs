@@ -85,20 +85,6 @@ namespace TorchRacing
             await Server.StartRace(Context.Player, countdown);
         });
 
-        [Command("end", "End the race if any")]
-        [Permission(MyPromoteLevel.None)]
-        public void EndRace() => this.CatchAndReport(() =>
-        {
-            Server.EndRace(Context.Player);
-        });
-
-        [Command("cancel", "Cancel the race if any")]
-        [Permission(MyPromoteLevel.None)]
-        public void CancelRace() => this.CatchAndReport(() =>
-        {
-            Server.CancelRace(Context.Player);
-        });
-
         [Command("reset", "Reset the current race state")]
         [Permission(MyPromoteLevel.None)]
         public void ResetRace() => this.CatchAndReport(() =>

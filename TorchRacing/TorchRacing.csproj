@@ -159,11 +159,14 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Properties\AssemblyInfo.cs" />
+        <Compile Include="TorchRacing.Core\HasPosition.cs" />
         <Compile Include="TorchRacing.Core\Race.cs" />
         <Compile Include="TorchRacing.Core\RaceCheckpoint.cs" />
+        <Compile Include="TorchRacing.Core\RaceGpsCollection.cs" />
         <Compile Include="TorchRacing.Core\Racer.cs" />
         <Compile Include="TorchRacing.Core\RacingServer.cs" />
         <Compile Include="TorchRacing.Core\RaceSafeZoneCollection.cs" />
+        <Compile Include="TorchRacing.Core\SerializedGpsHashSet.cs" />
         <Compile Include="TorchRacing.Core\SerializedRace.cs" />
         <Compile Include="TorchRacing\RacingCommandModule.cs" />
         <Compile Include="TorchRacing\RacingConfig.cs" />
@@ -177,5 +180,4 @@
     </PropertyGroup>
     <Import Project="..\TorchUtils\Utils.General\Utils.General.projitems" Label="Shared" />
     <Import Project="..\TorchUtils\Utils.Torch\Utils.Torch.projitems" Label="Shared" />
-    <Import Project="..\TorchUtils\Utils.TorchEntityGps\Utils.TorchEntityGps.projitems" Label="Shared" />
 </Project>
