@@ -119,6 +119,8 @@ namespace TorchRacing.Core
             foreach (var (_, racer) in _racers)
             {
                 racer.Reset();
+
+                _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
             }
 
             _finishedRacerIds.Clear();
@@ -158,64 +160,65 @@ namespace TorchRacing.Core
 
             foreach (var (racerId, racer) in _racers)
             {
-                for (var i = 0; i < _checkpoints.Count; i++)
+                var checkpointIndex = ((racer.LastCheckpoint ?? -1) + 1) % _checkpoints.Count;
+                var checkpoint = _checkpoints[checkpointIndex];
+
+                if (racer.HasChecked(checkpointIndex)) continue; // no duplicate
+                if (!checkpoint.Test(racer.Position)) continue; // proximity test
+
+                racer.Check(checkpointIndex);
+
+                //show the next checkpoint gps
+                var nextCheckpointIndex = (checkpointIndex + 1) % _checkpoints.Count;
+                var nextGpsPosition = _checkpoints[nextCheckpointIndex].Position;
+                _gpss.ShowGpss(racer.IdentityId, new[] {nextGpsPosition});
+
+                if (racer.CheckCount < _checkpoints.Count) continue; // still kicking the lap
+
+                racer.ClearChecks();
+                racer.IncrementLap();
+
+                if (racer.LapCount < _totalLapCount)
                 {
-                    var checkpoint = _checkpoints[i];
-
-                    if (!checkpoint.Test(racer.Position)) continue; // proximity
-                    if (racer.HasChecked(i)) continue; // no duplicate
-
-                    // prevent checking the final checkpoint at the beginning of the race
-                    // (make sure the player has stepped on the last checkpoint)
-                    if ((racer.LastCheckpoint ?? -1) + 1 != i) continue;
-
-                    racer.Check(i);
-
-                    //show the next checkpoint gps
-                    var nextGpsPosition = _checkpoints[(i + 1) % _checkpoints.Count].Position;
-                    _gpss.ShowGpss(racer.IdentityId, new[] {nextGpsPosition});
-
-                    if (racer.CheckCount < _checkpoints.Count) continue;
-
-                    racer.ClearChecks();
-                    racer.IncrementLap();
-
-                    if (racer.LapCount < _totalLapCount)
-                    {
-                        var order = LangUtils.OrderToString(racer.LapCount);
-                        SendMessage($"{racer.Name} has finished the {order} lap!");
-                        continue;
-                    }
-
-                    _finishedRacerIds.Add(racerId);
-
-                    var position = LangUtils.OrderToString(_finishedRacerIds.Count);
-                    SendMessage($"{racer.Name} FINISH! {position} place!");
-
-                    _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
-
-                    if (!_racers.Values.All(r => r.LapCount >= _totalLapCount)) continue;
-
-                    _isRacing = false;
-
-                    var result = new StringBuilder();
-                    result.AppendLine("ALL FINISH!");
-
-                    var rank = 1;
-                    foreach (var finishedRacerId in _finishedRacerIds)
-                    {
-                        // shouldn't happen but just in case
-                        if (!_racers.TryGetValue(finishedRacerId, out var rankedRacer)) continue;
-
-                        var rankStr = LangUtils.OrderToString(rank);
-                        result.AppendLine($" {rankStr}: {rankedRacer.Name}");
-                        rank += 1;
-                    }
-
-                    result.AppendLine("Type `!race start` to start the new race");
-
-                    SendMessage(result.ToString());
+                    var order = LangUtils.OrderToString(racer.LapCount);
+                    SendMessage($"{racer.Name} has finished the {order} lap!");
+                    continue; // still doing some more laps
                 }
+
+                _finishedRacerIds.Add(racerId);
+
+                var place = LangUtils.OrderToString(_finishedRacerIds.Count);
+                SendMessage($"{racer.Name} FINISH! {place} place!");
+
+                _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
+            }
+
+            if (_racers.Values.All(r => r.LapCount >= _totalLapCount)) // race finished
+            {
+                _isRacing = false;
+
+                foreach (var (_, racer) in _racers)
+                {
+                    _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
+                }
+
+                var resultText = new StringBuilder();
+                resultText.AppendLine("ALL FINISH!");
+
+                var rank = 1;
+                foreach (var finishedRacerId in _finishedRacerIds)
+                {
+                    // shouldn't happen but just in case
+                    if (!_racers.TryGetValue(finishedRacerId, out var rankedRacer)) continue;
+
+                    var rankStr = LangUtils.OrderToString(rank);
+                    resultText.AppendLine($" {rankStr}: {rankedRacer.Name}");
+                    rank += 1;
+                }
+
+                resultText.AppendLine("Type `!race start` to start the new race");
+
+                SendMessage(resultText.ToString());
             }
         }
 
