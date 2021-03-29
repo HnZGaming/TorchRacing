@@ -82,7 +82,7 @@ namespace TorchRacing.Core
                 MySession.Static.Gpss.SendAddGps(playerId, gps, true);
             }
 
-            Log.Info($"ShowGpss({playerId}, {positions.Select(p => p.ToShortString()).ToStringSeq()})");
+            Log.Debug($"ShowGpss({playerId}, {positions.Select(p => p.ToShortString()).ToStringSeq()})");
         }
 
         public void WriteIfNecessary()

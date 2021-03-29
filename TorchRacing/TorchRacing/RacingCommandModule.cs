@@ -75,9 +75,9 @@ namespace TorchRacing
 
         [Command("start", "Start the race in N seconds")]
         [Permission(MyPromoteLevel.None)]
-        public void StartRace(int countdown = 5) => this.CatchAndReport(async () =>
+        public void StartRace() => this.CatchAndReport(async () =>
         {
-            await Server.StartRace(Context.Player, countdown);
+            await Server.StartRace(Context.Player);
         });
 
         [Command("reset", "Reset the current race state")]

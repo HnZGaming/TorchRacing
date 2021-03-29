@@ -59,7 +59,7 @@ namespace TorchRacing.Core
             var racer = new Racer(player);
             _racers[player.SteamUserId] = racer;
 
-            SendMessageToAllRacers($"{player.DisplayName} joined the race!");
+            SendMessage($"{player.DisplayName} joined the race!");
 
             // show gpss to this player
 
@@ -77,19 +77,24 @@ namespace TorchRacing.Core
                 throw new Exception("Not joined the race");
             }
 
-            SendMessageToAllRacers($"{player.DisplayName} left the race");
+            SendMessage($"{player.DisplayName} left the race");
 
             _gpss.ShowGpss(player.IdentityId, Enumerable.Empty<Vector3D>());
         }
 
-        public async Task Start(ulong playerId, int countdown)
+        public async Task Start(ulong playerId)
         {
             ThrowIfNotHostOrAdmin(playerId);
             Reset(playerId);
 
-            for (var i = 0; i < countdown; i++)
+            if (_racers.Count == 0)
             {
-                SendMessageToAllRacers($"Starting race in {countdown - i} seconds...");
+                throw new Exception("no racers joined");
+            }
+
+            for (var i = 0; i < 5; i++)
+            {
+                SendMessage($"Starting race in {5 - i} seconds...", toServer: true);
 
                 await Task.Delay(1.Seconds());
                 await GameLoopObserver.MoveToGameLoop();
@@ -104,7 +109,7 @@ namespace TorchRacing.Core
                 _gpss.ShowGpss(racer.IdentityId, gpsPositions);
             }
 
-            SendMessageToAllRacers("GO!");
+            SendMessage("GO!", toServer: true);
         }
 
         public void Reset(ulong playerId)
@@ -120,7 +125,7 @@ namespace TorchRacing.Core
 
             _isRacing = false;
 
-            SendMessageToAllRacers("Race has been reset");
+            SendMessage("Race has been reset");
         }
 
         public void Update() // NOTE this is called EVERY frame
@@ -139,7 +144,7 @@ namespace TorchRacing.Core
             foreach (var (removedRacerId, racerName) in _tmpRemovedRacers)
             {
                 _racers.Remove(removedRacerId);
-                SendMessageToAllRacers($"{racerName} left the race");
+                SendMessage($"{racerName} left the race");
             }
 
             if (!_isRacing) return;
@@ -178,14 +183,14 @@ namespace TorchRacing.Core
                     if (racer.LapCount < _totalLapCount)
                     {
                         var order = LangUtils.OrderToString(racer.LapCount);
-                        SendMessageToAllRacers($"{racer.Name} finished the {order} lap!");
+                        SendMessage($"{racer.Name} has finished the {order} lap!");
                         continue;
                     }
 
                     _finishedRacerIds.Add(racerId);
 
                     var position = LangUtils.OrderToString(_finishedRacerIds.Count);
-                    SendMessageToAllRacers($"{racer.Name} GOAL! {position} position!");
+                    SendMessage($"{racer.Name} FINISH! {position} place!");
 
                     _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
 
@@ -193,13 +198,35 @@ namespace TorchRacing.Core
 
                     _isRacing = false;
 
-                    SendMessageToAllRacers("Everyone finished the race! Type `!race start` to start the new race");
+                    var result = new StringBuilder();
+                    result.AppendLine("ALL FINISH!");
+
+                    var rank = 1;
+                    foreach (var finishedRacerId in _finishedRacerIds)
+                    {
+                        // shouldn't happen but just in case
+                        if (!_racers.TryGetValue(finishedRacerId, out var rankedRacer)) continue;
+
+                        var rankStr = LangUtils.OrderToString(rank);
+                        result.AppendLine($" {rankStr}: {rankedRacer.Name}");
+                        rank += 1;
+                    }
+
+                    result.AppendLine("Type `!race start` to start the new race");
+
+                    SendMessage(result.ToString());
                 }
             }
         }
 
-        void SendMessageToAllRacers(string message)
+        void SendMessage(string message, bool toServer = false)
         {
+            if (toServer)
+            {
+                _chatManager.SendMessage(RaceServer, 0, message);
+                return;
+            }
+
             foreach (var (racerId, _) in _racers)
             {
                 _chatManager.SendMessage(RaceServer, racerId, message);

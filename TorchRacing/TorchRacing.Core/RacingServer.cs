@@ -127,10 +127,10 @@ namespace TorchRacing.Core
             _race.RemoveRacer(player);
         }
 
-        public async Task StartRace(IMyPlayer player, int countdown)
+        public async Task StartRace(IMyPlayer player)
         {
             _race.ThrowIfNull("race not initialized");
-            await _race.Start(player.SteamUserId, countdown);
+            await _race.Start(player.SteamUserId);
         }
 
         public void ResetRace(IMyPlayer player)
