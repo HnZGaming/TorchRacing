@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using NLog;
 using Sandbox.Game.World;
 using Torch;
 using Torch.API.Managers;
@@ -16,6 +17,7 @@ namespace TorchRacing.Core
     public sealed class Race : IDisposable
     {
         const string RaceServer = "Race";
+        static readonly ILogger Log = LogManager.GetCurrentClassLogger();
         readonly IChatManagerServer _chatManager;
         readonly Dictionary<ulong, Racer> _racers;
         readonly IReadOnlyList<RaceCheckpoint> _checkpoints;
@@ -176,8 +178,7 @@ namespace TorchRacing.Core
                     if (racer.LapCount < _totalLapCount)
                     {
                         var order = LangUtils.OrderToString(racer.LapCount);
-                        var remainingLapCount = _totalLapCount - racer.LapCount;
-                        SendMessageToAllRacers($"{racer.Name} has finished the {order} lap! {remainingLapCount} laps to go");
+                        SendMessageToAllRacers($"{racer.Name} finished the {order} lap!");
                         continue;
                     }
 
@@ -207,16 +208,16 @@ namespace TorchRacing.Core
 
         void ThrowIfNotHostOrAdmin(ulong steamId)
         {
-            if (steamId == 0) return;
-            if (steamId == _hostId) return;
-
-            var player = (IMyPlayer) MySession.Static.Players.TryGetPlayerBySteamId(steamId);
-            if (player?.PromoteLevel >= MyPromoteLevel.Moderator) return;
-
-            throw new Exception("not a host");
+            // if (steamId == 0) return;
+            // if (steamId == _hostId) return;
+            //
+            // var player = (IMyPlayer) MySession.Static.Players.TryGetPlayerBySteamId(steamId);
+            // if (player?.PromoteLevel >= MyPromoteLevel.Moderator) return;
+            //
+            // throw new Exception("not a host");
         }
 
-        public override string ToString()
+        public string ToString(bool debug)
         {
             var builder = new StringBuilder();
 
@@ -224,7 +225,7 @@ namespace TorchRacing.Core
             builder.AppendLine();
             foreach (var (_, racer) in _racers)
             {
-                builder.Append(racer);
+                builder.Append(racer.ToString(debug));
                 builder.AppendLine();
             }
 

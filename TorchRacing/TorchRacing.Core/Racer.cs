@@ -58,21 +58,31 @@ namespace TorchRacing.Core
             LapCount += 1;
         }
 
-        public override string ToString()
+        public string ToString(bool debug)
         {
             var builder = new StringBuilder();
 
             builder.Append(_player.DisplayName);
-            builder.Append(' ');
-            builder.Append(_player.IdentityId);
+
+            if (debug)
+            {
+                builder.Append(' ');
+                builder.Append(_player.IdentityId);
+            }
+
             builder.AppendLine();
-            builder.Append("--");
-            builder.Append("Lap count: ");
+            builder.Append("-- Lap count: ");
             builder.Append(LapCount);
             builder.AppendLine();
-            builder.Append("--");
-            builder.Append("Checkpoints: ");
+            builder.Append("-- Checkpoints: ");
             builder.Append(_testedCheckpoints.OrderBy(c => c).ToStringSeq());
+
+            if (debug)
+            {
+                builder.AppendLine();
+                builder.Append("-- Last checkpoint: ");
+                builder.Append(LastCheckpoint ?? -1);
+            }
 
             return builder.ToString();
         }

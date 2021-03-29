@@ -26,11 +26,13 @@ namespace TorchRacing
             this.ShowCommands();
         });
 
-        [Command("status", "Show status of the race")]
+        [Command("state", "Show status of the race")]
         [Permission(MyPromoteLevel.Moderator)]
-        public void ShowStatus() => this.CatchAndReport(() =>
+        public void ShowState() => this.CatchAndReport(() =>
         {
-            Context.Respond($"\n{Server}");
+            var promoteLevel = Context.Player?.PromoteLevel ?? MyPromoteLevel.Admin;
+            var debug = promoteLevel >= MyPromoteLevel.Moderator;
+            Context.Respond($"\n{Server.ToString(debug)}");
         });
 
         [Command("cpadd", "Add new checkpoint at the player position")]
@@ -55,13 +57,6 @@ namespace TorchRacing
         {
             this.EnsureInvokedByPlayer();
             Server.RemoveAllCheckpoints();
-        });
-
-        [Command("init", "Initialize a new race")]
-        [Permission(MyPromoteLevel.None)]
-        public void InitializeRace(int lapCount) => this.CatchAndReport(() =>
-        {
-            Server.InitializeRace(Context.Player, lapCount);
         });
 
         [Command("join", "Join the race if any")]

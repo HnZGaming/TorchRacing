@@ -53,6 +53,8 @@ namespace TorchRacing.Core
             }
 
             WriteToDb();
+
+            _race = new Race(_chatManager, _gpss, _checkpoints, 0, 3);
         }
 
         public void Dispose()
@@ -113,13 +115,6 @@ namespace TorchRacing.Core
             _db.Write();
         }
 
-        public void InitializeRace(IMyPlayer player, int lapCount)
-        {
-            _race?.Dispose();
-            _race = new Race(_chatManager, _gpss, _checkpoints, player.SteamUserId, lapCount);
-            _race.AddRacer(player);
-        }
-
         public void JoinRace(IMyPlayer player)
         {
             _race.ThrowIfNull("race not initialized");
@@ -144,19 +139,22 @@ namespace TorchRacing.Core
             _race.Reset(player.SteamUserId);
         }
 
-        public override string ToString()
+        public string ToString(bool debug)
         {
             var builder = new StringBuilder();
 
-            builder.Append("Checkpoints: ");
-            builder.AppendLine();
-            foreach (var checkpoint in _checkpoints)
+            if (debug)
             {
-                builder.Append(checkpoint);
+                builder.Append("Checkpoints: ");
                 builder.AppendLine();
+                foreach (var checkpoint in _checkpoints)
+                {
+                    builder.Append(checkpoint);
+                    builder.AppendLine();
+                }
             }
 
-            builder.Append(_race?.ToString() ?? "Not initialized");
+            builder.Append(_race?.ToString(debug) ?? "Not initialized");
             return builder.ToString();
         }
     }
