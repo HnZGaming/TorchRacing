@@ -157,5 +157,10 @@ namespace TorchRacing.Core
             builder.Append(_race?.ToString(debug) ?? "Not initialized");
             return builder.ToString();
         }
+
+        public override string ToString()
+        {
+            return ToString(true);
+        }
     }
 }
