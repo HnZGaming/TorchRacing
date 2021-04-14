@@ -11,7 +11,7 @@ using VRageMath;
 
 namespace TorchRacing.Core
 {
-    public sealed class RacingLobby : IDisposable
+    public sealed class RacingLobby
     {
         readonly RacingBroadcaster _chatManager;
         readonly RaceGpsCollection _gpss;
@@ -27,11 +27,6 @@ namespace TorchRacing.Core
             _racers = new Dictionary<ulong, Racer>();
             _chatManager = new RacingBroadcaster(chatManager, _racers.Keys);
             _tmpRemovedRacers = new List<(ulong, string)>();
-        }
-
-        public void Dispose()
-        {
-            _racers.Clear();
         }
 
         public void Update()
@@ -59,6 +54,10 @@ namespace TorchRacing.Core
                 Reset(0);
                 return;
             }
+
+            // skip if the track doesnt exist
+            // NOTE this is silent because we dont wanna spam the log
+            if (_checkpoints.Count <= 1) return;
 
             _game?.Update();
         }
@@ -105,6 +104,11 @@ namespace TorchRacing.Core
                 throw new Exception("Lap count cannot be zero");
             }
 
+            if (!_checkpoints.Any())
+            {
+                throw new Exception("No checkpoints in the race");
+            }
+
             Reset(playerId);
 
             if (_racers.Count == 0)
@@ -122,8 +126,6 @@ namespace TorchRacing.Core
                 await GameLoopObserver.MoveToGameLoop();
             }
 
-            _game = new RacingGame(_chatManager, _gpss, _checkpoints, _racers, lapCount);
-
             // show the first gps for all racers
             foreach (var (_, racer) in _racers)
             {
@@ -132,6 +134,8 @@ namespace TorchRacing.Core
             }
 
             _chatManager.SendMessage("GO!", toServer: true);
+
+            _game = new RacingGame(_chatManager, _gpss, _checkpoints, _racers, lapCount);
         }
 
         public void Reset(ulong playerId)

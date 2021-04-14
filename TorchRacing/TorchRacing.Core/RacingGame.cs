@@ -18,6 +18,7 @@ namespace TorchRacing.Core
         readonly List<ulong> _finishedRacerIds;
         readonly int _totalLapCount;
         readonly DateTime _startTime;
+        bool _done;
 
         public RacingGame(RacingBroadcaster chatManager,
             RaceGpsCollection gpss,
@@ -36,6 +37,8 @@ namespace TorchRacing.Core
 
         public void Update() // NOTE this is called EVERY frame
         {
+            if (_done) return;
+
             foreach (var (racerId, racer) in _racers)
             {
                 var checkpointIndex = ((racer.LastCheckpoint ?? -1) + 1) % _checkpoints.Count;
@@ -87,6 +90,8 @@ namespace TorchRacing.Core
 
             var allRacersFinished = _racers.Values.All(r => r.LapCount >= _totalLapCount);
             if (!allRacersFinished) return;
+
+            _done = true;
 
             foreach (var (_, racer) in _racers)
             {

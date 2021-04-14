@@ -9,7 +9,7 @@ using VRage.Game.ModAPI;
 
 namespace TorchRacing.Core
 {
-    public sealed class RacingServer : IDisposable
+    public sealed class RacingServer
     {
         public interface IConfig : RaceSafeZoneCollection.IConfig
         {
@@ -54,11 +54,6 @@ namespace TorchRacing.Core
             }
 
             WriteToDb();
-        }
-
-        public void Dispose()
-        {
-            _racingLobby?.Dispose();
         }
 
         public void Update()
