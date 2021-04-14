@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using NLog;
 using Torch.API.Managers;
@@ -25,7 +24,7 @@ namespace TorchRacing.Core
         readonly StupidDb<SerializedRace> _db;
         readonly List<RaceCheckpoint> _checkpoints;
         readonly RaceSafeZoneCollection _safezones;
-        Race _race;
+        RacingLobby _racingLobby;
 
         public RacingServer(IConfig config, RaceGpsCollection gpss, IChatManagerServer chatManager, string dbPath)
         {
@@ -39,7 +38,7 @@ namespace TorchRacing.Core
 
         public void Initialize()
         {
-            _race = new Race(_chatManager, _gpss, _checkpoints, 0, 3);
+            _racingLobby = new RacingLobby(_chatManager, _gpss, _checkpoints);
 
             _db.Read();
 
@@ -59,12 +58,12 @@ namespace TorchRacing.Core
 
         public void Dispose()
         {
-            _race?.Dispose();
+            _racingLobby?.Dispose();
         }
 
         public void Update()
         {
-            _race?.Update();
+            _racingLobby?.Update();
             _gpss.WriteIfNecessary();
         }
 
@@ -117,50 +116,38 @@ namespace TorchRacing.Core
 
         public void JoinRace(IMyPlayer player)
         {
-            _race.ThrowIfNull("race not initialized");
-            _race.AddRacer(player);
+            _racingLobby.ThrowIfNull("race not initialized");
+            _racingLobby.AddRacer(player);
         }
 
         public void ExitRace(IMyPlayer player)
         {
-            _race.ThrowIfNull("race not initialized");
-            _race.RemoveRacer(player);
+            _racingLobby.ThrowIfNull("race not initialized");
+            _racingLobby.RemoveRacer(player);
         }
 
-        public async Task StartRace(IMyPlayer player)
+        public async Task StartRace(IMyPlayer player, int lapCount)
         {
-            _race.ThrowIfNull("race not initialized");
-            await _race.Start(player.SteamUserId);
+            _racingLobby.ThrowIfNull("race not initialized");
+            await _racingLobby.Start(player.SteamUserId, lapCount);
         }
 
         public void ResetRace(IMyPlayer player)
         {
-            _race.ThrowIfNull("race not initialized");
-            _race.Reset(player.SteamUserId);
+            _racingLobby.ThrowIfNull("race not initialized");
+            _racingLobby.Reset(player.SteamUserId);
         }
 
-        public string ToString(bool debug)
+        public bool TryGetLobbyOfPlayer(ulong steamId, out RacingLobby lobby)
         {
-            var builder = new StringBuilder();
-
-            if (debug)
+            if (_racingLobby.ContainsPlayer(steamId))
             {
-                builder.Append("Checkpoints: ");
-                builder.AppendLine();
-                foreach (var checkpoint in _checkpoints)
-                {
-                    builder.Append(checkpoint);
-                    builder.AppendLine();
-                }
+                lobby = _racingLobby;
+                return true;
             }
 
-            builder.Append(_race?.ToString(debug) ?? "Not initialized");
-            return builder.ToString();
-        }
-
-        public override string ToString()
-        {
-            return ToString(true);
+            lobby = null;
+            return false;
         }
     }
 }
