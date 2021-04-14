@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Sandbox.Game.World;
@@ -12,11 +13,13 @@ namespace TorchRacing.Core
     {
         readonly IMyPlayer _player;
         readonly HashSet<int> _testedCheckpoints;
+        readonly List<DateTime> _lapTimestamps;
 
         public Racer(IMyPlayer player)
         {
             _player = player;
             _testedCheckpoints = new HashSet<int>();
+            _lapTimestamps = new List<DateTime>();
         }
 
         public Vector3D Position => _player.GetPosition();
@@ -24,16 +27,20 @@ namespace TorchRacing.Core
         public int LapCount { get; private set; }
         public bool IsOnline => MySession.Static.Players.IsPlayerOnline(_player.IdentityId);
         public int? LastCheckpoint { get; private set; }
-
         public string Name => _player.DisplayName;
-
         public long IdentityId => _player.IdentityId;
+
+        public bool TryGetLapTimestampAt(int index, out DateTime lapTimestamp)
+        {
+            return _lapTimestamps.TryGetElementAt(index, out lapTimestamp);
+        }
 
         public void Reset()
         {
             _testedCheckpoints.Clear();
             LastCheckpoint = null;
             LapCount = 0;
+            _lapTimestamps.Clear();
         }
 
         public bool HasChecked(int checkpointIndex)
@@ -47,15 +54,12 @@ namespace TorchRacing.Core
             LastCheckpoint = checkpointIndex;
         }
 
-        public void ClearChecks()
+        public void IncrementLap()
         {
             _testedCheckpoints.Clear();
             LastCheckpoint = null;
-        }
-
-        public void IncrementLap()
-        {
             LapCount += 1;
+            _lapTimestamps.Add(DateTime.UtcNow);
         }
 
         public string ToString(bool debug)
@@ -76,6 +80,13 @@ namespace TorchRacing.Core
             builder.AppendLine();
             builder.Append("-- Checkpoints: ");
             builder.Append(_testedCheckpoints.OrderBy(c => c).ToStringSeq());
+            builder.AppendLine();
+            builder.Append("-- Lap timestamps:");
+            foreach (var lapTimestamp in _lapTimestamps)
+            {
+                builder.AppendLine();
+                builder.Append($"---- {lapTimestamp:hh:mm:ss}");
+            }
 
             if (debug)
             {
@@ -85,6 +96,11 @@ namespace TorchRacing.Core
             }
 
             return builder.ToString();
+        }
+
+        public override string ToString()
+        {
+            return ToString(true);
         }
     }
 }

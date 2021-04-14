@@ -39,6 +39,8 @@ namespace TorchRacing.Core
 
         public void Initialize()
         {
+            _race = new Race(_chatManager, _gpss, _checkpoints, 0, 3);
+
             _db.Read();
 
             if (!_db.TryQuery(DefaultRaceId, out var race)) return;
@@ -53,8 +55,6 @@ namespace TorchRacing.Core
             }
 
             WriteToDb();
-
-            _race = new Race(_chatManager, _gpss, _checkpoints, 0, 3);
         }
 
         public void Dispose()
@@ -156,6 +156,11 @@ namespace TorchRacing.Core
 
             builder.Append(_race?.ToString(debug) ?? "Not initialized");
             return builder.ToString();
+        }
+
+        public override string ToString()
+        {
+            return ToString(true);
         }
     }
 }
