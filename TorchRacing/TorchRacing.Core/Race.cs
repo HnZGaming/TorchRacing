@@ -91,6 +91,8 @@ namespace TorchRacing.Core
                 throw new Exception("no racers joined");
             }
 
+            SendMessage($"Racers: {_racers.Select(r => r.Value.Name).ToStringSeq()}");
+
             for (var i = 0; i < 5; i++)
             {
                 SendMessage($"Starting race in {5 - i} seconds...", toServer: true);
@@ -292,6 +294,9 @@ namespace TorchRacing.Core
 
         void SendMessage(string message, bool toServer = false)
         {
+            _chatManager.SendMessage(RaceServer, 0, message);
+            return;
+
             if (toServer)
             {
                 _chatManager.SendMessage(RaceServer, 0, message);
