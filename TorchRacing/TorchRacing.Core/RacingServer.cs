@@ -10,157 +10,194 @@ using VRage.Game.ModAPI;
 
 namespace TorchRacing.Core
 {
-    public sealed class RacingServer : IDisposable
+    public sealed class RacingServer
     {
-        public interface IConfig : RaceSafeZoneCollection.IConfig
-        {
-            double SearchRadius { get; }
-        }
-
-        const string DefaultRaceId = "default";
         static readonly ILogger Log = LogManager.GetCurrentClassLogger();
-        readonly IConfig _config;
+        readonly RacingLobby.IConfig _config;
         readonly RaceGpsCollection _gpss;
         readonly IChatManagerServer _chatManager;
         readonly StupidDb<SerializedRace> _db;
-        readonly List<RaceCheckpoint> _checkpoints;
-        readonly RaceSafeZoneCollection _safezones;
-        Race _race;
+        readonly Dictionary<string, RacingLobby> _lobbies;
 
-        public RacingServer(IConfig config, RaceGpsCollection gpss, IChatManagerServer chatManager, string dbPath)
+        public RacingServer(RacingLobby.IConfig config, RaceGpsCollection gpss, IChatManagerServer chatManager, string dbPath)
         {
             _config = config;
             _gpss = gpss;
             _chatManager = chatManager;
             _db = new StupidDb<SerializedRace>(dbPath);
-            _checkpoints = new List<RaceCheckpoint>();
-            _safezones = new RaceSafeZoneCollection(config);
+            _lobbies = new Dictionary<string, RacingLobby>();
         }
 
         public void Initialize()
         {
-            _race = new Race(_chatManager, _gpss, _checkpoints, 0, 3);
-
             _db.Read();
 
-            if (!_db.TryQuery(DefaultRaceId, out var race)) return;
-
-            for (var i = 0; i < race.Checkpoints.Length; i++)
+            foreach (var race in _db.QueryAll())
             {
-                var checkpoint = race.Checkpoints[i];
-                _checkpoints.Add(checkpoint);
-
-                var safezone = race.CheckpointSafezones[i];
-                _safezones.FindOrCreateAndAdd(safezone, checkpoint.Position, checkpoint.Radius);
+                var lobby = new RacingLobby(_config, _chatManager, _gpss, race);
+                _lobbies[race.RaceId] = lobby;
             }
-
-            WriteToDb();
-        }
-
-        public void Dispose()
-        {
-            _race?.Dispose();
         }
 
         public void Update()
         {
-            _race?.Update();
+            foreach (var (_, lobby) in _lobbies)
+            {
+                lobby.Update();
+            }
+
             _gpss.WriteIfNecessary();
+        }
+
+        public void AddTrack(IMyPlayer player, string raceId)
+        {
+            if (_db.Contains(raceId))
+            {
+                throw new Exception($"Race exists: {raceId}");
+            }
+
+            var emptyRace = SerializedRace.Make(raceId, player.SteamUserId);
+            var lobby = new RacingLobby(_config, _chatManager, _gpss, emptyRace);
+            _lobbies[raceId] = lobby;
+
+            lobby.AddRacer(player);
+
+            WriteToDb();
+        }
+
+        public void DeleteTrack(IMyPlayer player)
+        {
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            
+            lobby.Clear(player.SteamUserId);
+            _lobbies.Remove(lobby.RaceId);
         }
 
         public void AddCheckpoint(IMyPlayer player, float radius, bool useSafezone)
         {
-            var position = player.GetPosition();
-            var checkpoint = new RaceCheckpoint(position, radius);
-            _checkpoints.Add(checkpoint);
-            _safezones.CreateAndAdd(position, radius, useSafezone);
-
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.AddCheckpoint(player, radius, useSafezone);
             WriteToDb();
         }
 
-        public void RemoveCheckpoint(IMyPlayer player)
+        public void ReplaceCheckpoint(IMyPlayer player, int index, float radius, bool useSafezone)
         {
-            var position = player.GetPosition();
-            var maxRadius = _config.SearchRadius;
-            if (!_checkpoints.TryGetNearestPositionIndex(position, maxRadius, out var checkpointIndex))
-            {
-                throw new Exception("No checkpoints found in the range");
-            }
-
-            _checkpoints.RemoveAt(checkpointIndex);
-            _safezones.RemoveAt(checkpointIndex);
-
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.ReplaceCheckpoint(player, index, radius, useSafezone);
             WriteToDb();
         }
 
-        public void RemoveAllCheckpoints()
+        public void DeleteCheckpoint(IMyPlayer player)
         {
-            _checkpoints.Clear();
-            _safezones.Clear();
-
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.DeleteCheckpoint(player);
             WriteToDb();
+        }
+
+        public void DeleteAllCheckpoints(IMyPlayer player)
+        {
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.DeleteAllCheckpoints(player.SteamUserId);
+            WriteToDb();
+        }
+
+        public void ShowAllCheckpoints(IMyPlayer player)
+        {
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.ShowAllCheckpoints(player.IdentityId);
         }
 
         void WriteToDb()
         {
-            var serializedRace = new SerializedRace
-            {
-                RaceId = DefaultRaceId,
-                Checkpoints = _checkpoints.ToArray(),
-                CheckpointSafezones = _safezones.GetSafezoneIds().ToArray(),
-            };
-
             _db.Clear();
-            _db.Insert(serializedRace);
+
+            foreach (var (_, race) in _lobbies)
+            {
+                var serializedRace = race.Serialize();
+                _db.Insert(serializedRace);
+            }
+
             _db.Write();
         }
 
-        public void JoinRace(IMyPlayer player)
+        public void JoinRace(IMyPlayer player, string raceId)
         {
-            _race.ThrowIfNull("race not initialized");
-            _race.AddRacer(player);
+            if (TryGetLobbyOfPlayer(player.SteamUserId, out _))
+            {
+                throw new Exception("Already in a lobby");
+            }
+
+            var lobby = GetLobbyOrThrow(raceId);
+            lobby.AddRacer(player);
         }
 
         public void ExitRace(IMyPlayer player)
         {
-            _race.ThrowIfNull("race not initialized");
-            _race.RemoveRacer(player);
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.RemoveRacer(player);
         }
 
-        public async Task StartRace(IMyPlayer player)
+        public async Task StartRace(IMyPlayer player, int lapCount)
         {
-            _race.ThrowIfNull("race not initialized");
-            await _race.Start(player.SteamUserId);
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            await lobby.Start(lapCount);
         }
 
         public void ResetRace(IMyPlayer player)
         {
-            _race.ThrowIfNull("race not initialized");
-            _race.Reset(player.SteamUserId);
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.Reset();
         }
 
-        public string ToString(bool debug)
+        RacingLobby GetLobbyOrThrow(string raceId)
         {
-            var builder = new StringBuilder();
-
-            if (debug)
+            if (!_lobbies.TryGetValue(raceId, out var lobby))
             {
-                builder.Append("Checkpoints: ");
-                builder.AppendLine();
-                foreach (var checkpoint in _checkpoints)
+                throw new Exception($"Race not found: {raceId}");
+            }
+
+            return lobby;
+        }
+
+        public bool TryGetLobbyOfPlayer(ulong steamId, out RacingLobby foundLobby)
+        {
+            foreach (var (_, lobby) in _lobbies)
+            {
+                if (lobby.ContainsPlayer(steamId))
                 {
-                    builder.Append(checkpoint);
-                    builder.AppendLine();
+                    foundLobby = lobby;
+                    return true;
                 }
             }
 
-            builder.Append(_race?.ToString(debug) ?? "Not initialized");
-            return builder.ToString();
+            foundLobby = null;
+            return false;
+        }
+
+        RacingLobby GetLobbyOfPlayerOrThrow(ulong steamId)
+        {
+            if (!TryGetLobbyOfPlayer(steamId, out var lobby))
+            {
+                throw new Exception("Not in a lobby");
+            }
+
+            return lobby;
         }
 
         public override string ToString()
         {
-            return ToString(true);
+            var sb = new StringBuilder();
+
+            foreach (var (raceId, lobby) in _lobbies)
+            {
+                sb.Append(raceId);
+                sb.Append(": ");
+                sb.Append(lobby.RacerCount);
+                sb.Append(" racers");
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
         }
     }
 }

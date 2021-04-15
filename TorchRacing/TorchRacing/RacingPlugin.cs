@@ -30,7 +30,6 @@ namespace TorchRacing
         {
             base.Init(torch);
             this.ListenOnGameLoaded(OnGameLoad);
-            this.ListenOnGameUnloading(OnGameUnloading);
 
             var configPath = this.MakeConfigFilePath();
             _config = Persistent<RacingConfig>.Load(configPath);
@@ -56,11 +55,6 @@ namespace TorchRacing
         {
             base.Update();
             _racingServer.Update();
-        }
-
-        void OnGameUnloading()
-        {
-            _racingServer.Dispose();
         }
     }
 }

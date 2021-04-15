@@ -27,43 +27,84 @@ namespace TorchRacing
         });
 
         [Command("state", "Show status of the race")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Permission(MyPromoteLevel.None)]
         public void ShowState() => this.CatchAndReport(() =>
         {
             var promoteLevel = Context.Player?.PromoteLevel ?? MyPromoteLevel.Admin;
             var debug = promoteLevel >= MyPromoteLevel.Moderator;
-            Context.Respond($"\n{Server.ToString(debug)}");
+            var steamId = Context.Player?.SteamUserId ?? 0;
+
+            if (Server.TryGetLobbyOfPlayer(steamId, out var lobby))
+            {
+                Context.Respond($"\n{lobby.ToString(debug)}");
+            }
+            else
+            {
+                Context.Respond($"\n{Server}");
+            }
         });
 
-        [Command("cpadd", "Add new checkpoint at the player position")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Command("createtrack", "Create new race track")]
+        [Permission(MyPromoteLevel.None)]
+        public void CreateRaceTrack(string raceId) => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.AddTrack(Context.Player, raceId);
+        });
+
+        [Command("deletetrack", "Create new race track")]
+        [Permission(MyPromoteLevel.None)]
+        public void DeleteRaceTrack() => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.DeleteTrack(Context.Player);
+        });
+
+        [Command("addcp", "Add new checkpoint at the player position")]
+        [Permission(MyPromoteLevel.None)]
         public void AddCheckpoint(float radius, bool useSafezone) => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
             Server.AddCheckpoint(Context.Player, radius, useSafezone);
         });
 
-        [Command("cpdel", "Remove the checkpoint closest to the player")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Command("replacecp", "Replace the checkpoint identified by the index")]
+        [Permission(MyPromoteLevel.None)]
+        public void ReplaceCheckpoint(int index, float radius, bool useSafezone) => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.ReplaceCheckpoint(Context.Player, index - 1, radius, useSafezone);
+        });
+
+        [Command("deletecp", "Remove the checkpoint closest to the player")]
+        [Permission(MyPromoteLevel.None)]
         public void RemoveCheckpoint() => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
-            Server.RemoveCheckpoint(Context.Player);
+            Server.DeleteCheckpoint(Context.Player);
         });
 
-        [Command("cpdelall", "Remove the checkpoint closest to the player")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Command("deleteallcp", "Remove the checkpoint closest to the player")]
+        [Permission(MyPromoteLevel.None)]
         public void RemoveAllCheckpoints() => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
-            Server.RemoveAllCheckpoints();
+            Server.DeleteAllCheckpoints(Context.Player);
+        });
+
+        [Command("showallcp", "Show all checkpoints")]
+        [Permission(MyPromoteLevel.None)]
+        public void ShowAllCheckpoints() => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.ShowAllCheckpoints(Context.Player);
         });
 
         [Command("join", "Join the race if any")]
         [Permission(MyPromoteLevel.None)]
-        public void JoinRace() => this.CatchAndReport(() =>
+        public void JoinRace(string raceId) => this.CatchAndReport(() =>
         {
-            Server.JoinRace(Context.Player);
+            Server.JoinRace(Context.Player, raceId);
         });
 
         [Command("exit", "Exit the race if any")]
@@ -73,11 +114,11 @@ namespace TorchRacing
             Server.ExitRace(Context.Player);
         });
 
-        [Command("start", "Start the race in N seconds")]
+        [Command("start", "Start the race")]
         [Permission(MyPromoteLevel.None)]
-        public void StartRace() => this.CatchAndReport(async () =>
+        public void StartRace(int lapCount = 3) => this.CatchAndReport(async () =>
         {
-            await Server.StartRace(Context.Player);
+            await Server.StartRace(Context.Player, lapCount);
         });
 
         [Command("reset", "Reset the current race state")]

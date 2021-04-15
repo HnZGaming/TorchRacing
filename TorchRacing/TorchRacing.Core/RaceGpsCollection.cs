@@ -51,7 +51,7 @@ namespace TorchRacing.Core
             _db.Write();
         }
 
-        public void ShowGpss(long playerId, IEnumerable<Vector3D> positions)
+        public void ReplaceGpss(long playerId, IEnumerable<Vector3D> positions)
         {
             _isDirty = true;
 
@@ -64,11 +64,11 @@ namespace TorchRacing.Core
                 }
             }
 
-            foreach (var position in positions)
+            foreach (var (position, index) in positions.Indexed())
             {
                 var gps = new MyGps(new MyObjectBuilder_Gps.Entry
                 {
-                    DisplayName = "CHECKPOINT",
+                    DisplayName = $"CHECKPOINT <{index + 1}>",
                     coords = position,
                     color = ColorUtils.TranslateColor(_config.GpsColor),
                     showOnHud = true,
@@ -82,7 +82,23 @@ namespace TorchRacing.Core
                 MySession.Static.Gpss.SendAddGps(playerId, gps, true);
             }
 
-            Log.Debug($"ShowGpss({playerId}, {positions.Select(p => p.ToShortString()).ToStringSeq()})");
+            Log.Debug($"ReplaceGpss({playerId}, {positions.Select(p => p.ToShortString()).ToStringSeq()})");
+        }
+
+        public void ClearGpss(IEnumerable<long> playerIds)
+        {
+            _isDirty = true;
+            foreach (var playerId in playerIds)
+            {
+                if (!_gpsHashes.TryGetValue(playerId, out var gpsHashes)) continue;
+
+                foreach (var gpsHash in gpsHashes)
+                {
+                    MySession.Static.Gpss.SendDelete(playerId, gpsHash);
+                }
+
+                _gpsHashes.Remove(playerId);
+            }
         }
 
         public void WriteIfNecessary()

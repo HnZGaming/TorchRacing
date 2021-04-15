@@ -7,7 +7,7 @@ using VRage.Game.ModAPI;
 
 namespace TorchRacing
 {
-    public sealed class RacingConfig : ViewModel, RacingServer.IConfig, RaceGpsCollection.IConfig
+    public sealed class RacingConfig : ViewModel, RacingLobby.IConfig, RaceGpsCollection.IConfig
     {
         const string SafeZoneGroupName = "Checkpoint Safe Zone";
         double _searchRadius = 100;
