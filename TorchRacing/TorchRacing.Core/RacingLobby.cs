@@ -79,6 +79,25 @@ namespace TorchRacing.Core
             _chatManager.SendMessage($"Checkpoint <{_checkpoints.Count}> added");
         }
 
+        public void ReplaceCheckpoint(IMyPlayer player, int index, float radius, bool useSafezone)
+        {
+            ThrowIfNotHostOrAdmin(player.SteamUserId);
+
+            var checkpoint = _checkpoints[index];
+            var position = player.GetPosition();
+            checkpoint.Position = position;
+            checkpoint.Radius = radius;
+            _safezones.Replace(index, position, radius, useSafezone);
+
+            var positions = _checkpoints.Select(c => c.Position);
+            foreach (var (_, racer) in _racers)
+            {
+                _gpss.ReplaceGpss(racer.IdentityId, positions);
+            }
+
+            _chatManager.SendMessage($"Checkpoint <{index + 1}> replaced");
+        }
+
         public void DeleteCheckpoint(IMyPlayer player)
         {
             ThrowIfNotHostOrAdmin(player.SteamUserId);
@@ -104,6 +123,11 @@ namespace TorchRacing.Core
             _safezones.Clear();
 
             _chatManager.SendMessage($"All checkpoints deleted");
+        }
+
+        public void ShowAllCheckpoints(long playerId)
+        {
+            _gpss.ReplaceGpss(playerId, _checkpoints.Select(p => p.Position));
         }
 
         public void AddRacer(IMyPlayer player)

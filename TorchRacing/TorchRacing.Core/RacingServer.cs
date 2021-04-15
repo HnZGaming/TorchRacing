@@ -80,6 +80,13 @@ namespace TorchRacing.Core
             WriteToDb();
         }
 
+        public void ReplaceCheckpoint(IMyPlayer player, int index, float radius, bool useSafezone)
+        {
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.ReplaceCheckpoint(player, index, radius, useSafezone);
+            WriteToDb();
+        }
+
         public void DeleteCheckpoint(IMyPlayer player)
         {
             var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
@@ -92,6 +99,12 @@ namespace TorchRacing.Core
             var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
             lobby.DeleteAllCheckpoints(player.SteamUserId);
             WriteToDb();
+        }
+
+        public void ShowAllCheckpoints(IMyPlayer player)
+        {
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            lobby.ShowAllCheckpoints(player.IdentityId);
         }
 
         void WriteToDb()

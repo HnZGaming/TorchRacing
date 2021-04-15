@@ -68,6 +68,14 @@ namespace TorchRacing
             Server.AddCheckpoint(Context.Player, radius, useSafezone);
         });
 
+        [Command("replacecp", "Replace the checkpoint identified by the index")]
+        [Permission(MyPromoteLevel.None)]
+        public void ReplaceCheckpoint(int index, float radius, bool useSafezone) => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.ReplaceCheckpoint(Context.Player, index - 1, radius, useSafezone);
+        });
+
         [Command("deletecp", "Remove the checkpoint closest to the player")]
         [Permission(MyPromoteLevel.None)]
         public void RemoveCheckpoint() => this.CatchAndReport(() =>
@@ -82,6 +90,14 @@ namespace TorchRacing
         {
             this.EnsureInvokedByPlayer();
             Server.DeleteAllCheckpoints(Context.Player);
+        });
+
+        [Command("showallcp", "Show all checkpoints")]
+        [Permission(MyPromoteLevel.None)]
+        public void ShowAllCheckpoints() => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.ShowAllCheckpoints(Context.Player);
         });
 
         [Command("join", "Join the race if any")]

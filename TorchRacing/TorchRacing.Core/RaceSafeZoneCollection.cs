@@ -70,6 +70,29 @@ namespace TorchRacing.Core
             _safezones.Add(NullOr.NotNull(safezone));
         }
 
+        public void Replace(int index, Vector3D position, float radius, bool useSafezone)
+        {
+            var safezoneRef = _safezones[index];
+            if (safezoneRef.TryGet(out var safezone))
+            {
+                if (useSafezone)
+                {
+                    safezone.PositionComp.SetPosition(position);
+                    safezone.Radius = radius;
+                }
+                else
+                {
+                    DeleteSafezone(safezone);
+                    _safezones[index] = NullOr.Null<MySafeZone>();
+                }
+            }
+            else if (useSafezone)
+            {
+                safezone = CreateSafezone(position, radius);
+                _safezones[index] = NullOr.NotNull(safezone);
+            }
+        }
+
         public void RemoveAt(int index)
         {
             var removedSafezone = _safezones[index];
