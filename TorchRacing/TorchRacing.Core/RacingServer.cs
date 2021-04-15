@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using NLog;
 using Torch.API.Managers;
@@ -30,6 +31,12 @@ namespace TorchRacing.Core
         public void Initialize()
         {
             _db.Read();
+
+            foreach (var race in _db.QueryAll())
+            {
+                var lobby = new RacingLobby(_config, _chatManager, _gpss, race);
+                _lobbies[race.RaceId] = lobby;
+            }
         }
 
         public void Update()
@@ -42,23 +49,28 @@ namespace TorchRacing.Core
             _gpss.WriteIfNecessary();
         }
 
-        public void CreateTrack(IMyPlayer player, string raceId)
+        public void AddTrack(IMyPlayer player, string raceId)
         {
             if (_db.Contains(raceId))
             {
                 throw new Exception($"Race exists: {raceId}");
             }
 
-            var emptyRace = new SerializedRace
-            {
-                RaceId = raceId,
-                OwnerSteamId = player.SteamUserId,
-                Checkpoints = new RaceCheckpoint[0],
-                CheckpointSafezones = new long[0],
-            };
-
+            var emptyRace = SerializedRace.Make(raceId, player.SteamUserId);
             var lobby = new RacingLobby(_config, _chatManager, _gpss, emptyRace);
             _lobbies[raceId] = lobby;
+
+            lobby.AddRacer(player);
+
+            WriteToDb();
+        }
+
+        public void DeleteTrack(IMyPlayer player)
+        {
+            var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
+            
+            lobby.Clear(player.SteamUserId);
+            _lobbies.Remove(lobby.RaceId);
         }
 
         public void AddCheckpoint(IMyPlayer player, float radius, bool useSafezone)
@@ -68,17 +80,17 @@ namespace TorchRacing.Core
             WriteToDb();
         }
 
-        public void RemoveCheckpoint(IMyPlayer player)
+        public void DeleteCheckpoint(IMyPlayer player)
         {
             var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
-            lobby.RemoveCheckpoint(player);
+            lobby.DeleteCheckpoint(player);
             WriteToDb();
         }
 
-        public void RemoveAllCheckpoints(IMyPlayer player)
+        public void DeleteAllCheckpoints(IMyPlayer player)
         {
             var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
-            lobby.RemoveAllCheckpoints(player);
+            lobby.DeleteAllCheckpoints(player.SteamUserId);
             WriteToDb();
         }
 
@@ -115,13 +127,13 @@ namespace TorchRacing.Core
         public async Task StartRace(IMyPlayer player, int lapCount)
         {
             var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
-            await lobby.Start(player.SteamUserId, lapCount);
+            await lobby.Start(lapCount);
         }
 
         public void ResetRace(IMyPlayer player)
         {
             var lobby = GetLobbyOfPlayerOrThrow(player.SteamUserId);
-            lobby.Reset(player.SteamUserId);
+            lobby.Reset();
         }
 
         RacingLobby GetLobbyOrThrow(string raceId)
@@ -157,6 +169,22 @@ namespace TorchRacing.Core
             }
 
             return lobby;
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+
+            foreach (var (raceId, lobby) in _lobbies)
+            {
+                sb.Append(raceId);
+                sb.Append(": ");
+                sb.Append(lobby.RacerCount);
+                sb.Append(" racers");
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
         }
     }
 }

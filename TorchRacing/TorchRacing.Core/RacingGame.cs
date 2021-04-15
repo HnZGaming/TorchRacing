@@ -18,7 +18,7 @@ namespace TorchRacing.Core
         readonly List<ulong> _finishedRacerIds;
         readonly int _totalLapCount;
         readonly DateTime _startTime;
-        bool _done;
+        public bool Done { get; private set; }
 
         public RacingGame(RacingBroadcaster chatManager,
             RaceGpsCollection gpss,
@@ -37,7 +37,7 @@ namespace TorchRacing.Core
 
         public void Update() // NOTE this is called EVERY frame
         {
-            if (_done) return;
+            if (Done) return;
 
             foreach (var (racerId, racer) in _racers)
             {
@@ -52,7 +52,7 @@ namespace TorchRacing.Core
                 //show the next checkpoint gps
                 var nextCheckpointIndex = (checkpointIndex + 1) % _checkpoints.Count;
                 var nextGpsPosition = _checkpoints[nextCheckpointIndex].Position;
-                _gpss.ShowGpss(racer.IdentityId, new[] {nextGpsPosition});
+                _gpss.ReplaceGpss(racer.IdentityId, new[] {nextGpsPosition});
 
                 if (racer.CheckCount < _checkpoints.Count) continue; // still kicking the lap
 
@@ -85,17 +85,17 @@ namespace TorchRacing.Core
 
                 _chatManager.SendMessage($"Total time: {FormatLapTime(totalTime)}");
 
-                _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
+                _gpss.ReplaceGpss(racer.IdentityId, new Vector3D[0]);
             }
 
             var allRacersFinished = _racers.Values.All(r => r.LapCount >= _totalLapCount);
             if (!allRacersFinished) return;
 
-            _done = true;
+            Done = true;
 
             foreach (var (_, racer) in _racers)
             {
-                _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
+                _gpss.ReplaceGpss(racer.IdentityId, new Vector3D[0]);
             }
 
             var resultText = new StringBuilder();

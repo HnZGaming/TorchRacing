@@ -27,43 +27,61 @@ namespace TorchRacing
         });
 
         [Command("state", "Show status of the race")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Permission(MyPromoteLevel.None)]
         public void ShowState() => this.CatchAndReport(() =>
         {
             var promoteLevel = Context.Player?.PromoteLevel ?? MyPromoteLevel.Admin;
             var debug = promoteLevel >= MyPromoteLevel.Moderator;
+            var steamId = Context.Player?.SteamUserId ?? 0;
 
-            if (!Server.TryGetLobbyOfPlayer(Context.Player?.SteamUserId ?? 0, out var lobby))
+            if (Server.TryGetLobbyOfPlayer(steamId, out var lobby))
             {
-                Context.Respond("You're not in any lobbies");
-                return;
+                Context.Respond($"\n{lobby.ToString(debug)}");
             }
-
-            Context.Respond($"\n{lobby.ToString(debug)}");
+            else
+            {
+                Context.Respond($"\n{Server}");
+            }
         });
 
-        [Command("cpadd", "Add new checkpoint at the player position")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Command("createtrack", "Create new race track")]
+        [Permission(MyPromoteLevel.None)]
+        public void CreateRaceTrack(string raceId) => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.AddTrack(Context.Player, raceId);
+        });
+
+        [Command("deletetrack", "Create new race track")]
+        [Permission(MyPromoteLevel.None)]
+        public void DeleteRaceTrack() => this.CatchAndReport(() =>
+        {
+            this.EnsureInvokedByPlayer();
+            Server.DeleteTrack(Context.Player);
+        });
+
+        [Command("addcp", "Add new checkpoint at the player position")]
+        [Permission(MyPromoteLevel.None)]
         public void AddCheckpoint(float radius, bool useSafezone) => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
             Server.AddCheckpoint(Context.Player, radius, useSafezone);
         });
 
-        [Command("cpdel", "Remove the checkpoint closest to the player")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Command("deletecp", "Remove the checkpoint closest to the player")]
+        [Permission(MyPromoteLevel.None)]
         public void RemoveCheckpoint() => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
-            Server.RemoveCheckpoint(Context.Player);
+            Server.DeleteCheckpoint(Context.Player);
         });
 
-        [Command("cpdelall", "Remove the checkpoint closest to the player")]
-        [Permission(MyPromoteLevel.Moderator)]
+        [Command("deleteallcp", "Remove the checkpoint closest to the player")]
+        [Permission(MyPromoteLevel.None)]
         public void RemoveAllCheckpoints() => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
-            Server.RemoveAllCheckpoints(Context.Player);
+            Server.DeleteAllCheckpoints(Context.Player);
         });
 
         [Command("join", "Join the race if any")]

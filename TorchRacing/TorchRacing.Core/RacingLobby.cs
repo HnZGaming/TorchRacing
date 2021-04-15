@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Sandbox.Game.World;
+using Torch;
 using Torch.API.Managers;
 using Utils.General;
 using Utils.Torch;
@@ -25,7 +27,6 @@ namespace TorchRacing.Core
         readonly RaceSafeZoneCollection _safezones;
         readonly Dictionary<ulong, Racer> _racers;
         readonly List<(ulong, string)> _tmpRemovedRacers;
-        readonly string _raceId;
         readonly ulong ownerId;
         RacingGame _game;
 
@@ -35,15 +36,16 @@ namespace TorchRacing.Core
             RaceGpsCollection gpss,
             SerializedRace serializedRace)
         {
-            _config = config;
-            _gpss = gpss;
-            _chatManager = new RacingBroadcaster(chatManager, _racers.Keys);
             _checkpoints = new List<RaceCheckpoint>();
             _safezones = new RaceSafeZoneCollection(config);
             _racers = new Dictionary<ulong, Racer>();
             _tmpRemovedRacers = new List<(ulong, string)>();
-            _raceId = serializedRace.RaceId;
+
+            _config = config;
+            _gpss = gpss;
+            RaceId = serializedRace.RaceId;
             ownerId = serializedRace.OwnerSteamId;
+            _chatManager = new RacingBroadcaster(chatManager, RaceId, _racers.Keys);
 
             for (var i = 0; i < serializedRace.Checkpoints.Length; i++)
             {
@@ -55,12 +57,142 @@ namespace TorchRacing.Core
             }
         }
 
+        public string RaceId { get; }
+        public int RacerCount => _racers.Count;
+
         public SerializedRace Serialize() => new SerializedRace
         {
-            RaceId = _raceId,
+            RaceId = RaceId,
             Checkpoints = _checkpoints.ToArray(),
             CheckpointSafezones = _safezones.GetSafezoneIds().ToArray(),
         };
+
+        public void AddCheckpoint(IMyPlayer player, float radius, bool useSafezone)
+        {
+            ThrowIfNotHostOrAdmin(player.SteamUserId);
+
+            var position = player.GetPosition();
+            var checkpoint = new RaceCheckpoint(position, radius);
+            _checkpoints.Add(checkpoint);
+            _safezones.CreateAndAdd(position, radius, useSafezone);
+
+            _chatManager.SendMessage($"Checkpoint <{_checkpoints.Count}> added");
+        }
+
+        public void DeleteCheckpoint(IMyPlayer player)
+        {
+            ThrowIfNotHostOrAdmin(player.SteamUserId);
+
+            var position = player.GetPosition();
+            var maxRadius = _config.SearchRadius;
+            if (!_checkpoints.TryGetNearestPositionIndex(position, maxRadius, out var checkpointIndex))
+            {
+                throw new Exception("No checkpoints found in the range");
+            }
+
+            _checkpoints.RemoveAt(checkpointIndex);
+            _safezones.RemoveAt(checkpointIndex);
+
+            _chatManager.SendMessage($"Checkpoint <{checkpointIndex + 1}> deleted");
+        }
+
+        public void DeleteAllCheckpoints(ulong playerId)
+        {
+            ThrowIfNotHostOrAdmin(playerId);
+
+            _checkpoints.Clear();
+            _safezones.Clear();
+
+            _chatManager.SendMessage($"All checkpoints deleted");
+        }
+
+        public void AddRacer(IMyPlayer player)
+        {
+            if (_racers.ContainsKey(player.SteamUserId))
+            {
+                throw new Exception("Already joined the race");
+            }
+
+            var racer = new Racer(player);
+            _racers[player.SteamUserId] = racer;
+
+            _chatManager.SendMessage($"{player.DisplayName} joined the race!");
+
+            // show gpss to this player
+
+            var gpsPositions = _game == null
+                ? _checkpoints.Select(c => c.Position)
+                : new[] {_checkpoints[0].Position};
+
+            _gpss.ReplaceGpss(player.IdentityId, gpsPositions);
+        }
+
+        public void RemoveRacer(IMyPlayer player)
+        {
+            if (!_racers.Remove(player.SteamUserId))
+            {
+                throw new Exception("Not joined the race");
+            }
+
+            _chatManager.SendMessage($"{player.DisplayName} left the race");
+
+            _gpss.ReplaceGpss(player.IdentityId, Enumerable.Empty<Vector3D>());
+        }
+
+        public void Clear(ulong steamId)
+        {
+            ThrowIfNotHostOrAdmin(steamId);
+
+            Reset();
+
+            _gpss.ClearGpss(_racers.Values.Select(r => r.IdentityId));
+
+            _chatManager.SendMessage("All racers ejected from the race");
+            _racers.Clear();
+
+            _safezones.Clear();
+        }
+
+        public async Task Start(int lapCount)
+        {
+            if (lapCount <= 0)
+            {
+                throw new Exception("Lap count cannot be zero");
+            }
+
+            if (!_checkpoints.Any())
+            {
+                throw new Exception("No checkpoints in the race");
+            }
+
+            Reset();
+
+            if (_racers.Count == 0)
+            {
+                throw new Exception("no racers joined");
+            }
+
+            _chatManager.SendMessage($"Racers: {_racers.Select(r => r.Value.Name).ToStringSeq()}");
+
+            for (var i = 0; i < 5; i++)
+            {
+                _chatManager.SendMessage($"Starting race in {5 - i} seconds...", toServer: true);
+
+                await Task.Delay(1.Seconds());
+                await GameLoopObserver.MoveToGameLoop();
+            }
+
+            // show the first gps for all racers
+            foreach (var (_, racer) in _racers)
+            {
+                var gpsPositions = new[] {_checkpoints[0].Position};
+                _gpss.ReplaceGpss(racer.IdentityId, gpsPositions);
+            }
+
+            _chatManager.SendMessage("GO!", toServer: true);
+
+            _game = new RacingGame(_chatManager, _gpss, _checkpoints, _racers, lapCount);
+        }
 
         public void Update()
         {
@@ -84,7 +216,7 @@ namespace TorchRacing.Core
             // cancel if there's no racers
             if (_racers.Count == 0)
             {
-                Reset(0);
+                Reset();
                 return;
             }
 
@@ -95,120 +227,15 @@ namespace TorchRacing.Core
             _game?.Update();
         }
 
-        public void AddCheckpoint(IMyPlayer player, float radius, bool useSafezone)
-        {
-            var position = player.GetPosition();
-            var checkpoint = new RaceCheckpoint(position, radius);
-            _checkpoints.Add(checkpoint);
-            _safezones.CreateAndAdd(position, radius, useSafezone);
-        }
-
-        public void RemoveCheckpoint(IMyPlayer player)
-        {
-            var position = player.GetPosition();
-            var maxRadius = _config.SearchRadius;
-            if (!_checkpoints.TryGetNearestPositionIndex(position, maxRadius, out var checkpointIndex))
-            {
-                throw new Exception("No checkpoints found in the range");
-            }
-
-            _checkpoints.RemoveAt(checkpointIndex);
-            _safezones.RemoveAt(checkpointIndex);
-        }
-
-        public void RemoveAllCheckpoints(IMyPlayer player)
-        {
-            _checkpoints.Clear();
-            _safezones.Clear();
-        }
-
-        public void AddRacer(IMyPlayer player)
-        {
-            if (_racers.ContainsKey(player.SteamUserId))
-            {
-                throw new Exception("Already joined the race");
-            }
-
-            var racer = new Racer(player);
-            _racers[player.SteamUserId] = racer;
-
-            _chatManager.SendMessage($"{player.DisplayName} joined the race!");
-
-            // show gpss to this player
-
-            var gpsPositions = _game == null
-                ? _checkpoints.Select(c => c.Position)
-                : new[] {_checkpoints[0].Position};
-
-            _gpss.ShowGpss(player.IdentityId, gpsPositions);
-        }
-
-        public void RemoveRacer(IMyPlayer player)
-        {
-            if (!_racers.Remove(player.SteamUserId))
-            {
-                throw new Exception("Not joined the race");
-            }
-
-            _chatManager.SendMessage($"{player.DisplayName} left the race");
-
-            _gpss.ShowGpss(player.IdentityId, Enumerable.Empty<Vector3D>());
-        }
-
-        public async Task Start(ulong playerId, int lapCount)
-        {
-            ThrowIfNotHostOrAdmin(playerId);
-
-            if (lapCount <= 0)
-            {
-                throw new Exception("Lap count cannot be zero");
-            }
-
-            if (!_checkpoints.Any())
-            {
-                throw new Exception("No checkpoints in the race");
-            }
-
-            Reset(playerId);
-
-            if (_racers.Count == 0)
-            {
-                throw new Exception("no racers joined");
-            }
-
-            _chatManager.SendMessage($"Racers: {_racers.Select(r => r.Value.Name).ToStringSeq()}");
-
-            for (var i = 0; i < 5; i++)
-            {
-                _chatManager.SendMessage($"Starting race in {5 - i} seconds...", toServer: true);
-
-                await Task.Delay(1.Seconds());
-                await GameLoopObserver.MoveToGameLoop();
-            }
-
-            // show the first gps for all racers
-            foreach (var (_, racer) in _racers)
-            {
-                var gpsPositions = new[] {_checkpoints[0].Position};
-                _gpss.ShowGpss(racer.IdentityId, gpsPositions);
-            }
-
-            _chatManager.SendMessage("GO!", toServer: true);
-
-            _game = new RacingGame(_chatManager, _gpss, _checkpoints, _racers, lapCount);
-        }
-
-        public void Reset(ulong playerId)
+        public void Reset()
         {
             if (_game == null) return;
-
-            ThrowIfNotHostOrAdmin(playerId);
 
             foreach (var (_, racer) in _racers)
             {
                 racer.Reset();
 
-                _gpss.ShowGpss(racer.IdentityId, new Vector3D[0]);
+                _gpss.ReplaceGpss(racer.IdentityId, new Vector3D[0]);
             }
 
             _game = null;
@@ -218,13 +245,13 @@ namespace TorchRacing.Core
 
         void ThrowIfNotHostOrAdmin(ulong steamId)
         {
-            // if (steamId == 0) return;
-            // if (steamId == _hostId) return;
-            //
-            // var player = (IMyPlayer) MySession.Static.Players.TryGetPlayerBySteamId(steamId);
-            // if (player?.PromoteLevel >= MyPromoteLevel.Moderator) return;
-            //
-            // throw new Exception("not a host");
+            if (steamId == 0) return;
+            if (steamId == ownerId) return;
+
+            var player = (IMyPlayer) MySession.Static.Players.TryGetPlayerBySteamId(steamId);
+            if (player?.PromoteLevel >= MyPromoteLevel.Moderator) return;
+
+            throw new Exception("not a host");
         }
 
         public bool ContainsPlayer(ulong steamId)
