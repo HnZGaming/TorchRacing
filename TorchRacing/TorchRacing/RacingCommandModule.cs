@@ -33,14 +33,13 @@ namespace TorchRacing
             var promoteLevel = Context.Player?.PromoteLevel ?? MyPromoteLevel.Admin;
             var debug = promoteLevel >= MyPromoteLevel.Moderator;
 
-            if (Server.TryGetLobbyOfPlayer(Context.Player?.SteamUserId ?? 0, out var lobby))
-            {
-                Context.Respond($"\n{lobby.ToString(debug)}");
-            }
-            else
+            if (!Server.TryGetLobbyOfPlayer(Context.Player?.SteamUserId ?? 0, out var lobby))
             {
                 Context.Respond("You're not in any lobbies");
+                return;
             }
+
+            Context.Respond($"\n{lobby.ToString(debug)}");
         });
 
         [Command("cpadd", "Add new checkpoint at the player position")]
@@ -64,14 +63,14 @@ namespace TorchRacing
         public void RemoveAllCheckpoints() => this.CatchAndReport(() =>
         {
             this.EnsureInvokedByPlayer();
-            Server.RemoveAllCheckpoints();
+            Server.RemoveAllCheckpoints(Context.Player);
         });
 
         [Command("join", "Join the race if any")]
         [Permission(MyPromoteLevel.None)]
-        public void JoinRace() => this.CatchAndReport(() =>
+        public void JoinRace(string raceId) => this.CatchAndReport(() =>
         {
-            Server.JoinRace(Context.Player);
+            Server.JoinRace(Context.Player, raceId);
         });
 
         [Command("exit", "Exit the race if any")]

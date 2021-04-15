@@ -9,6 +9,9 @@ namespace TorchRacing.Core
         [JsonProperty("id")]
         public string RaceId { get; set; }
 
+        [JsonProperty("owner")]
+        public ulong OwnerSteamId { get; set; }
+
         [JsonProperty("checkpoints")]
         public RaceCheckpoint[] Checkpoints { get; set; } = new RaceCheckpoint[0];
 

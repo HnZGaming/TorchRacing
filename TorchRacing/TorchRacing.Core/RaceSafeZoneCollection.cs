@@ -94,7 +94,7 @@ namespace TorchRacing.Core
                 MatrixD.CreateWorld(playerPos),
                 MySafeZoneShape.Sphere,
                 MySafeZoneAccess.Blacklist,
-                null, null, radius, true,
+                null, null, radius, false,
                 color: ColorUtils.TranslateColor(_config.DefaultSafeZoneColor),
                 visualTexture: _config.DefaultSafeZoneTexture ?? "");
         }

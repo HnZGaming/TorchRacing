@@ -13,21 +13,54 @@ namespace TorchRacing.Core
 {
     public sealed class RacingLobby
     {
+        public interface IConfig : RaceSafeZoneCollection.IConfig
+        {
+            double SearchRadius { get; }
+        }
+
+        readonly IConfig _config;
         readonly RacingBroadcaster _chatManager;
         readonly RaceGpsCollection _gpss;
-        readonly IReadOnlyList<RaceCheckpoint> _checkpoints;
+        readonly List<RaceCheckpoint> _checkpoints;
+        readonly RaceSafeZoneCollection _safezones;
         readonly Dictionary<ulong, Racer> _racers;
         readonly List<(ulong, string)> _tmpRemovedRacers;
+        readonly string _raceId;
+        readonly ulong ownerId;
         RacingGame _game;
 
-        public RacingLobby(IChatManagerServer chatManager, RaceGpsCollection gpss, IReadOnlyList<RaceCheckpoint> checkpoints)
+        public RacingLobby(
+            IConfig config,
+            IChatManagerServer chatManager,
+            RaceGpsCollection gpss,
+            SerializedRace serializedRace)
         {
+            _config = config;
             _gpss = gpss;
-            _checkpoints = checkpoints;
-            _racers = new Dictionary<ulong, Racer>();
             _chatManager = new RacingBroadcaster(chatManager, _racers.Keys);
+            _checkpoints = new List<RaceCheckpoint>();
+            _safezones = new RaceSafeZoneCollection(config);
+            _racers = new Dictionary<ulong, Racer>();
             _tmpRemovedRacers = new List<(ulong, string)>();
+            _raceId = serializedRace.RaceId;
+            ownerId = serializedRace.OwnerSteamId;
+
+            for (var i = 0; i < serializedRace.Checkpoints.Length; i++)
+            {
+                var checkpoint = serializedRace.Checkpoints[i];
+                _checkpoints.Add(checkpoint);
+
+                var safezone = serializedRace.CheckpointSafezones[i];
+                _safezones.FindOrCreateAndAdd(safezone, checkpoint.Position, checkpoint.Radius);
+            }
         }
+
+        public SerializedRace Serialize() => new SerializedRace
+        {
+            RaceId = _raceId,
+            Checkpoints = _checkpoints.ToArray(),
+            CheckpointSafezones = _safezones.GetSafezoneIds().ToArray(),
+        };
 
         public void Update()
         {
@@ -60,6 +93,33 @@ namespace TorchRacing.Core
             if (_checkpoints.Count <= 1) return;
 
             _game?.Update();
+        }
+
+        public void AddCheckpoint(IMyPlayer player, float radius, bool useSafezone)
+        {
+            var position = player.GetPosition();
+            var checkpoint = new RaceCheckpoint(position, radius);
+            _checkpoints.Add(checkpoint);
+            _safezones.CreateAndAdd(position, radius, useSafezone);
+        }
+
+        public void RemoveCheckpoint(IMyPlayer player)
+        {
+            var position = player.GetPosition();
+            var maxRadius = _config.SearchRadius;
+            if (!_checkpoints.TryGetNearestPositionIndex(position, maxRadius, out var checkpointIndex))
+            {
+                throw new Exception("No checkpoints found in the range");
+            }
+
+            _checkpoints.RemoveAt(checkpointIndex);
+            _safezones.RemoveAt(checkpointIndex);
+        }
+
+        public void RemoveAllCheckpoints(IMyPlayer player)
+        {
+            _checkpoints.Clear();
+            _safezones.Clear();
         }
 
         public void AddRacer(IMyPlayer player)
