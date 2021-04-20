@@ -30,13 +30,11 @@ namespace TorchRacing
         [Permission(MyPromoteLevel.None)]
         public void ShowState() => this.CatchAndReport(() =>
         {
-            var promoteLevel = Context.Player?.PromoteLevel ?? MyPromoteLevel.Admin;
-            var debug = promoteLevel >= MyPromoteLevel.Moderator;
             var steamId = Context.Player?.SteamUserId ?? 0;
 
             if (Server.TryGetLobbyOfPlayer(steamId, out var lobby))
             {
-                Context.Respond($"\n{lobby.ToString(debug)}");
+                Context.Respond($"\n{lobby}");
             }
             else
             {
