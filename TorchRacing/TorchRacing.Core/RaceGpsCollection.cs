@@ -43,7 +43,7 @@ namespace TorchRacing.Core
             {
                 if (gpsHashes.Contains(gps.Hash))
                 {
-                    MySession.Static.Gpss.SendDelete(identityId, gps.Hash);
+                    MySession.Static.Gpss.SendDeleteGpsRequest(identityId, gps.Hash);
                 }
             }
 
@@ -51,7 +51,7 @@ namespace TorchRacing.Core
             _db.Write();
         }
 
-        public void ShowGpss(long playerId, IEnumerable<Vector3D> positions)
+        public void ReplaceGpss(long playerId, IEnumerable<Vector3D> positions, int indexOffset = 0)
         {
             _isDirty = true;
 
@@ -60,15 +60,16 @@ namespace TorchRacing.Core
             {
                 foreach (var gpsHash in gpsHashes)
                 {
-                    MySession.Static.Gpss.SendDelete(playerId, gpsHash);
+                    MySession.Static.Gpss.SendDeleteGpsRequest(playerId, gpsHash);
                 }
             }
 
+            var index = indexOffset;
             foreach (var position in positions)
             {
                 var gps = new MyGps(new MyObjectBuilder_Gps.Entry
                 {
-                    DisplayName = "CHECKPOINT",
+                    DisplayName = $"CHECKPOINT <{index++ + 1}>",
                     coords = position,
                     color = ColorUtils.TranslateColor(_config.GpsColor),
                     showOnHud = true,
@@ -79,10 +80,26 @@ namespace TorchRacing.Core
                 gps.UpdateHash();
 
                 _gpsHashes.Add(playerId, gps.Hash);
-                MySession.Static.Gpss.SendAddGps(playerId, gps, true);
+                MySession.Static.Gpss.SendAddGpsRequest(playerId, gps, true);
             }
 
-            Log.Debug($"ShowGpss({playerId}, {positions.Select(p => p.ToShortString()).ToStringSeq()})");
+            Log.Debug($"ReplaceGpss({playerId}, {positions.Select(p => p.ToShortString()).ToStringSeq()})");
+        }
+
+        public void ClearGpss(IEnumerable<long> playerIds)
+        {
+            _isDirty = true;
+            foreach (var playerId in playerIds)
+            {
+                if (!_gpsHashes.TryGetValue(playerId, out var gpsHashes)) continue;
+
+                foreach (var gpsHash in gpsHashes)
+                {
+                    MySession.Static.Gpss.SendDeleteGpsRequest(playerId, gpsHash);
+                }
+
+                _gpsHashes.Remove(playerId);
+            }
         }
 
         public void WriteIfNecessary()
