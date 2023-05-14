@@ -62,17 +62,14 @@ namespace TorchRacing.Core
             _lapTimestamps.Add(DateTime.UtcNow);
         }
 
-        public string ToString(bool debug)
+        public override string ToString()
         {
             var builder = new StringBuilder();
 
             builder.Append(_player.DisplayName);
 
-            if (debug)
-            {
-                builder.Append(' ');
-                builder.Append(_player.IdentityId);
-            }
+            builder.Append(' ');
+            builder.Append(_player.IdentityId);
 
             builder.AppendLine();
             builder.Append("-- Lap count: ");
@@ -88,19 +85,11 @@ namespace TorchRacing.Core
                 builder.Append($"---- {lapTimestamp:hh:mm:ss}");
             }
 
-            if (debug)
-            {
-                builder.AppendLine();
-                builder.Append("-- Last checkpoint: ");
-                builder.Append(LastCheckpoint ?? -1);
-            }
+            builder.AppendLine();
+            builder.Append("-- Last checkpoint: ");
+            builder.Append(LastCheckpoint ?? -1);
 
             return builder.ToString();
-        }
-
-        public override string ToString()
-        {
-            return ToString(true);
         }
     }
 }

@@ -4,6 +4,7 @@ using Torch;
 using Torch.API;
 using Torch.API.Managers;
 using Torch.API.Plugins;
+using Torch.API.Session;
 using TorchRacing.Core;
 using Utils.General;
 using Utils.Torch;
@@ -29,9 +30,9 @@ namespace TorchRacing
         public override void Init(ITorchBase torch)
         {
             base.Init(torch);
-            this.ListenOnGameLoaded(OnGameLoad);
+            this.OnSessionStateChanged(TorchSessionState.Loaded, OnGameLoad);
 
-            var configPath = this.MakeConfigFilePath();
+            var configPath = this.MakeFilePath($"{nameof(RacingPlugin)}.cfg");
             _config = Persistent<RacingConfig>.Load(configPath);
         }
 

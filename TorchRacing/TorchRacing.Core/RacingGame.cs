@@ -52,7 +52,7 @@ namespace TorchRacing.Core
                 //show the next checkpoint gps
                 var nextCheckpointIndex = (checkpointIndex + 1) % _checkpoints.Count;
                 var nextGpsPosition = _checkpoints[nextCheckpointIndex].Position;
-                _gpss.ReplaceGpss(racer.IdentityId, new[] {nextGpsPosition});
+                _gpss.ReplaceGpss(racer.IdentityId, new[] {nextGpsPosition}, nextCheckpointIndex);
 
                 if (racer.CheckCount < _checkpoints.Count) continue; // still kicking the lap
 
@@ -85,7 +85,7 @@ namespace TorchRacing.Core
 
                 _chatManager.SendMessage($"Total time: {FormatLapTime(totalTime)}");
 
-                _gpss.ReplaceGpss(racer.IdentityId, new Vector3D[0]);
+                _gpss.ReplaceGpss(racer.IdentityId, Array.Empty<Vector3D>());
             }
 
             var allRacersFinished = _racers.Values.All(r => r.LapCount >= _totalLapCount);
@@ -95,7 +95,7 @@ namespace TorchRacing.Core
 
             foreach (var (_, racer) in _racers)
             {
-                _gpss.ReplaceGpss(racer.IdentityId, new Vector3D[0]);
+                _gpss.ReplaceGpss(racer.IdentityId, Array.Empty<Vector3D>());
             }
 
             var resultText = new StringBuilder();
