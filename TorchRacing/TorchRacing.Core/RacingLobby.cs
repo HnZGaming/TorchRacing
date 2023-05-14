@@ -146,7 +146,7 @@ namespace TorchRacing.Core
 
             var gpsPositions = _game == null
                 ? _checkpoints.Select(c => c.Position)
-                : new[] {_checkpoints[0].Position};
+                : new[] { _checkpoints[0].Position };
 
             _gpss.ReplaceGpss(player.IdentityId, gpsPositions);
         }
@@ -203,13 +203,13 @@ namespace TorchRacing.Core
                 _chatManager.SendMessage($"Starting race in {5 - i} seconds...", toServer: true);
 
                 await Task.Delay(1.Seconds());
-                await GameLoopObserver.MoveToGameLoop();
+                await VRageUtils.MoveToGameLoop();
             }
 
             // show the first gps for all racers
             foreach (var (_, racer) in _racers)
             {
-                var gpsPositions = new[] {_checkpoints[0].Position};
+                var gpsPositions = new[] { _checkpoints[0].Position };
                 _gpss.ReplaceGpss(racer.IdentityId, gpsPositions);
             }
 
@@ -272,7 +272,7 @@ namespace TorchRacing.Core
             if (steamId == 0) return;
             if (steamId == _ownerId) return;
 
-            var player = (IMyPlayer) MySession.Static.Players.TryGetPlayerBySteamId(steamId);
+            var player = (IMyPlayer)MySession.Static.Players.TryGetPlayerBySteamId(steamId);
             if (player?.PromoteLevel >= MyPromoteLevel.Moderator) return;
 
             throw new Exception("not a host");
@@ -290,7 +290,7 @@ namespace TorchRacing.Core
             var ownerName = MySession.Static.Players.TryGetIdentityNameFromSteamId(_ownerId);
             builder.Append($"Owner: {ownerName.OrNull() ?? $"<{_ownerId}>"}");
             builder.AppendLine();
-            
+
             builder.Append("Checkpoints: ");
             builder.AppendLine();
             foreach (var checkpoint in _checkpoints)
