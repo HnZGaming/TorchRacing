@@ -1,13 +1,7 @@
 <?xml version="1.0"?>
-
 <PluginManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-
   <Name>Racing</Name>
-
   <Guid>EC211AE3-0BED-46AF-B6D1-B8CE93F31009</Guid>
-
   <Repository>https://github.com/HnZGaming/TorchRacing</Repository>
-
-  <Version>v1.0.8534.37902</Version>
-
+  <Version>v1.1.0</Version>
 </PluginManifest>
