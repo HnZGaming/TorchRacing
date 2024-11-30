@@ -114,7 +114,7 @@ namespace TorchRacing
 
         [Command("start", "Start the race")]
         [Permission(MyPromoteLevel.None)]
-        public void StartRace(int lapCount = 3) => this.CatchAndReport(async () =>
+        public void StartRace(int lapCount = 3) => this.CatchAndReportAsync(async () =>
         {
             await Server.StartRace(Context.Player, lapCount);
         });
